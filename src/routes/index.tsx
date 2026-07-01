@@ -4,9 +4,8 @@ import {
   Maximize2, Video, ImageIcon, Power,
   Play, RotateCcw, ToggleLeft, Bell, AlertTriangle, Wifi, Activity, Radio,
 } from "lucide-react";
-import rovImage from "../assets/rov.png";
-
 import poliwangiLogo from "../assets/Logo Poliwangi HD.png";
+import qrCodeImage from "../assets/qr.jpeg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -296,6 +295,9 @@ function QuickControls() {
   );
 }
 
+import rovImage from "../assets/rov.png";
+
+
 function QRPanel() {
   return (
     <div className="panel p-3">
@@ -304,20 +306,12 @@ function QRPanel() {
         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[color:var(--color-success)]/20 text-[color:var(--color-success)]">VALID</span>
       </div>
       <div className="grid grid-cols-[80px_1fr] gap-3 items-center">
-        <div className="aspect-square bg-white p-1.5 rounded">
-          <svg viewBox="0 0 21 21" className="w-full h-full">
-            {Array.from({ length: 21 }).map((_, y) =>
-              Array.from({ length: 21 }).map((_, x) => {
-                const filled = (x * 7 + y * 3 + (x % 3) * (y % 2)) % 3 === 0 ||
-                  (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
-                const isCorner = ((x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13)) &&
-                  !(x > 0 && x < 6 && y > 0 && y < 6 && !(x > 1 && x < 5 && y > 1 && y < 5)) &&
-                  !(x > 14 && x < 20 && y > 0 && y < 6 && !(x > 15 && x < 19 && y > 1 && y < 5)) &&
-                  !(x > 0 && x < 6 && y > 14 && y < 20 && !(x > 1 && x < 5 && y > 15 && y < 19));
-                return <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill={filled || isCorner ? "#000" : "transparent"} />;
-              })
-            )}
-          </svg>
+        <div className="aspect-square bg-white p-1 rounded overflow-hidden">
+          <img
+            src={qrCodeImage}
+            alt="Detected QR Code"
+            className="w-full h-full object-cover"
+          />
         </div>
         <div className="space-y-1.5 text-xs">
           <Field label="Code" value="A23C-045" />
