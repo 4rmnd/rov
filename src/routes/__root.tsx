@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { Sidebar } from "../components/Sidebar";
 
 function NotFoundComponent() {
   return (
@@ -74,7 +75,12 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+          <Outlet />
+        </div>
+      </div>
     </QueryClientProvider>
   );
 }
