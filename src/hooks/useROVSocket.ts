@@ -59,6 +59,31 @@ export interface CameraResult {
   filepath?: string;
 }
 
+export interface AutonomousStatus {
+  state: string;
+  target_id: string;
+  elapsed_s: number;
+  is_active: boolean;
+  waypoint_index?: number;
+  waypoint_total?: number;
+}
+
+export interface FailsafeSubsystem {
+  ok: boolean;
+  severity: string;
+  message: string;
+  recovery_attempts: number;
+  fault_since: number | null;
+}
+
+export interface FailsafeStatus {
+  emergency_active: boolean;
+  emergency_reason: string;
+  subsystems: Record<string, FailsafeSubsystem>;
+  event_count: number;
+  timestamp: string;
+}
+
 export interface ROVSocketState {
   connected: boolean;
   mavlinkConnected: boolean;
@@ -68,6 +93,8 @@ export interface ROVSocketState {
   qrStatus: QRStatus | null;
   dockAligned: boolean;
   lastCameraResult: CameraResult | null;
+  autonomousStatus: AutonomousStatus | null;
+  failsafeStatus: FailsafeStatus | null;
 }
 
 export function useROVSocket() {
@@ -81,6 +108,8 @@ export function useROVSocket() {
     qrStatus: null,
     dockAligned: false,
     lastCameraResult: null,
+    autonomousStatus: null,
+    failsafeStatus: null,
   });
 
   useEffect(() => {
@@ -92,7 +121,13 @@ export function useROVSocket() {
     });
 
     socket.on("disconnect", () => {
-      setState(s => ({ ...s, connected: false, dockAligned: false }));
+      setState(s => ({
+        ...s,
+        connected: false,
+        dockAligned: false,
+        autonomousStatus: null,
+        failsafeStatus: null,
+      }));
     });
 
     socket.on("mavlink_status", (data: { connected: boolean }) => {
@@ -121,6 +156,33 @@ export function useROVSocket() {
 
     socket.on("camera_result", (data: CameraResult) => {
       setState(s => ({ ...s, lastCameraResult: data }));
+    });
+
+    socket.on("autonomous_status", (data: AutonomousStatus) => {
+      setState(s => ({ ...s, autonomousStatus: data }));
+    });
+
+    socket.on("failsafe_status", (data: FailsafeStatus) => {
+      setState(s => ({ ...s, failsafeStatus: data }));
+    });
+
+    socket.on("emergency_stop", (data: { message: string }) => {
+      setState(s => ({
+        ...s,
+        failsafeStatus: s.failsafeStatus
+          ? {
+              ...s.failsafeStatus,
+              emergency_active: true,
+              emergency_reason: data.message || "Emergency Stop",
+            }
+          : {
+              emergency_active: true,
+              emergency_reason: data.message || "Emergency Stop",
+              subsystems: {},
+              event_count: 0,
+              timestamp: new Date().toISOString(),
+            },
+      }));
     });
 
     // Latency Ping-Pong
@@ -182,6 +244,18 @@ export function useROVSocket() {
     }
   };
 
+  const sendAutonomousStart = (targetId: string) => {
+    if (socketRef.current) {
+      socketRef.current.emit("cmd_autonomous_start", { target_id: targetId });
+    }
+  };
+
+  const sendAutonomousStop = () => {
+    if (socketRef.current) {
+      socketRef.current.emit("cmd_autonomous_stop", { reason: "operator_abort" });
+    }
+  };
+
   return {
     ...state,
     sendEmergencyStop,
@@ -191,5 +265,7 @@ export function useROVSocket() {
     sendSetMode,
     sendGripper,
     sendLight,
+    sendAutonomousStart,
+    sendAutonomousStop,
   };
 }

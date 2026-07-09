@@ -78,9 +78,36 @@ function Dashboard() {
   };
 
   const depthVal = socket.telemetry?.depth ?? 0;
+  const failsafe = socket.failsafeStatus;
+  const isEmergency = failsafe?.emergency_active;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
+        {/* Emergency Stop Lockout Overlay */}
+        {isEmergency && (
+          <div className="absolute inset-0 bg-red-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-8 animate-fade-in">
+            <div className="w-20 h-20 rounded-full bg-red-500/20 border border-red-500 flex items-center justify-center mb-6 animate-pulse">
+              <Power size={40} className="text-red-500" />
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-wider text-red-500 uppercase mb-2">
+              Emergency Stop Active
+            </h1>
+            <p className="text-muted-foreground text-xs max-w-sm mb-6">
+              The ROV thrusters have been disarmed due to a critical safety event. Verify hardware and telemetry before clearing.
+            </p>
+            <div className="bg-black/40 border border-red-500/30 rounded-lg px-5 py-3.5 mb-6 font-mono text-left max-w-md w-full">
+              <div className="text-[9px] text-red-400 uppercase tracking-widest mb-1 font-bold">Watchdog Event Reason</div>
+              <div className="text-xs text-foreground">{failsafe?.emergency_reason || "Operator Triggered E-Stop"}</div>
+            </div>
+            <button
+              onClick={socket.sendClearEmergency}
+              className="px-6 py-2.5 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold rounded-md text-xs tracking-wider transition-all shadow-[0_0_15px_rgba(239,68,68,0.4)] cursor-pointer uppercase"
+            >
+              Clear Emergency State
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <header className="h-13 shrink-0 border-b border-panel-border px-6 flex items-center justify-between bg-[color:var(--color-sidebar)]">
           <div className="flex items-center gap-4">
@@ -146,7 +173,7 @@ function Dashboard() {
           </div>
           <button
             onClick={socket.sendEmergencyStop}
-            className="flex items-center gap-2 bg-[color:var(--color-danger)] text-white font-bold px-4 py-1.5 rounded-md text-xs tracking-wider hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 bg-[color:var(--color-danger)] text-white font-bold px-4 py-1.5 rounded-md text-xs tracking-wider hover:opacity-90 transition-opacity cursor-pointer"
           >
             <Power size={13} /> EMERGENCY STOP
           </button>
@@ -193,13 +220,19 @@ function Dashboard() {
           </div>
 
           {/* Right column */}
-          <div className="min-h-0 overflow-hidden flex flex-col gap-3">
+          <div className="min-h-0 overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin">
             <QRPanel
               qrStatus={socket.qrStatus}
               dockAligned={socket.dockAligned}
               qrHistory={qrHistory}
               onClearHistory={handleClearQrHistory}
             />
+            <AutonomousPanel
+              status={socket.autonomousStatus}
+              onStart={socket.sendAutonomousStart}
+              onStop={socket.sendAutonomousStop}
+            />
+            <FailsafePanel status={failsafe} />
             <ROVDesignPanel orientation={socket.trajectory?.orientation} />
             <InformationPanel
               telemetry={socket.telemetry}
@@ -863,6 +896,196 @@ function Field({
       <span className={`${mono ? "font-mono" : ""} ${accent ? "text-accent font-bold" : "text-foreground"} text-xs`}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function AutonomousPanel({
+  status,
+  onStart,
+  onStop,
+}: {
+  status: any;
+  onStart: (targetId: string) => void;
+  onStop: () => void;
+}) {
+  const [targetId, setTargetId] = useState("DOCK_STATION_A");
+  const [isSavingTarget, setIsSavingTarget] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
+  const isActive = status?.is_active ?? false;
+  const ROV_URL = import.meta.env.VITE_ROV_URL ?? "http://localhost:8000";
+
+  const handleSetTarget = async () => {
+    if (!targetId.trim()) return;
+    setIsSavingTarget(true);
+    setSaveMessage("");
+    try {
+      const res = await fetch(`${ROV_URL}/api/trajectory/set_target`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_id: targetId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSaveMessage(`Saved ${data.waypoints} waypoints!`);
+        setTimeout(() => setSaveMessage(""), 4000);
+      } else {
+        setSaveMessage(`Failed: ${data.error || "Unknown"}`);
+      }
+    } catch (e: any) {
+      setSaveMessage("Failed connecting to API");
+    } finally {
+      setIsSavingTarget(false);
+    }
+  };
+
+  return (
+    <div className="panel p-3 flex flex-col gap-3">
+      <div className="flex items-center justify-between border-b border-panel-border/50 pb-2">
+        <span className="label-caps">Semi-Autonomous Mission</span>
+        <span
+          className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+            isActive
+              ? "bg-accent/20 text-accent animate-pulse"
+              : "bg-panel-border/30 text-muted-foreground"
+          }`}
+        >
+          {isActive ? status?.state || "ACTIVE" : "STANDBY"}
+        </span>
+      </div>
+
+      <div className="space-y-2 text-xs">
+        <div className="flex flex-col gap-1">
+          <label className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold">Target Station ID</label>
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              value={targetId}
+              onChange={(e) => setTargetId(e.target.value)}
+              disabled={isActive}
+              placeholder="e.g. DOCK_A"
+              className="flex-1 bg-panel border border-panel-border rounded px-2.5 py-1 font-mono text-xs text-foreground focus:outline-none focus:border-accent disabled:opacity-50"
+            />
+            <button
+              onClick={handleSetTarget}
+              disabled={isActive || isSavingTarget}
+              className="px-2.5 py-1 bg-panel hover:bg-accent hover:text-black border border-panel-border rounded text-[10px] font-bold cursor-pointer transition-colors disabled:opacity-50"
+            >
+              {isSavingTarget ? "Saving..." : "Set Target"}
+            </button>
+          </div>
+          {saveMessage && (
+            <span className="text-[9px] font-mono text-accent mt-0.5">{saveMessage}</span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 pt-1.5">
+          <button
+            onClick={() => onStart(targetId)}
+            disabled={isActive}
+            className="flex items-center justify-center gap-1.5 py-1.5 rounded bg-accent hover:bg-accent/80 text-black font-bold text-xs tracking-wider cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Play size={12} fill="currentColor" /> START MISSION
+          </button>
+          <button
+            onClick={onStop}
+            disabled={!isActive}
+            className="flex items-center justify-center gap-1.5 py-1.5 rounded bg-red-500/20 hover:bg-red-500 hover:text-white border border-red-500/30 text-red-400 font-bold text-xs tracking-wider cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Power size={12} /> ABORT MISSION
+          </button>
+        </div>
+
+        {isActive && (
+          <div className="bg-[oklch(0.12_0.02_245)] border border-panel-border/60 rounded-md p-2.5 space-y-1.5 font-mono text-[10px] mt-1">
+            <div className="flex justify-between border-b border-panel-border/10 pb-1">
+              <span className="text-muted-foreground uppercase text-[9px]">Mission Stage</span>
+              <span className="text-accent font-bold">{status?.state}</span>
+            </div>
+            <div className="flex justify-between border-b border-panel-border/10 pb-1">
+              <span className="text-muted-foreground uppercase text-[9px]">Elapsed Time</span>
+              <span className="text-foreground">{status?.elapsed_s} s</span>
+            </div>
+            {(status?.waypoint_index !== undefined) && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground uppercase text-[9px]">Waypoint Progress</span>
+                <span className="text-foreground">
+                  {status?.waypoint_index} / {status?.waypoint_total || "?"}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FailsafePanel({ status }: { status: any }) {
+  if (!status) {
+    return (
+      <div className="panel p-3">
+        <div className="label-caps mb-2">Failsafe System Health</div>
+        <div className="text-muted-foreground/30 text-xs italic text-center py-4 font-mono">
+          Waiting for security heartbeat...
+        </div>
+      </div>
+    );
+  }
+
+  const subsystems = status.subsystems || {};
+
+  return (
+    <div className="panel p-3 flex flex-col gap-3">
+      <div className="flex items-center justify-between border-b border-panel-border/50 pb-2">
+        <span className="label-caps">Security Watchdog L1</span>
+        <span
+          className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+            status.emergency_active
+              ? "bg-red-500/20 text-red-500 animate-pulse"
+              : "bg-green-500/10 text-green-400"
+          }`}
+        >
+          {status.emergency_active ? "EMERGENCY" : "SECURE"}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 font-mono text-[10px]">
+        {Object.entries(subsystems).map(([name, h]: [string, any]) => {
+          let displayName = name.toUpperCase();
+          if (name === "mavlink") displayName = "MAVLINK LINK";
+          else if (name === "dashboard") displayName = "GCS LINK";
+          else if (name === "telemetry") displayName = "TELEMETRY FRESHNESS";
+          else if (name === "camera_front") displayName = "FRONT CAMERA";
+          else if (name === "camera_bottom") displayName = "BOTTOM CAMERA";
+          else if (name === "system") displayName = "HOST PI RESOURCE";
+
+          let toneClass = "text-green-400 bg-green-500/10 border-green-500/25";
+          if (h.severity === "WARNING") {
+            toneClass = "text-yellow-400 bg-yellow-500/10 border-yellow-500/25";
+          } else if (h.severity === "CRITICAL" || h.severity === "EMERGENCY") {
+            toneClass = "text-red-400 bg-red-500/10 border-red-500/25";
+          }
+
+          return (
+            <div
+              key={name}
+              className="flex items-center justify-between border-b border-panel-border/20 pb-1.5 last:border-0"
+            >
+              <div className="flex flex-col">
+                <span className="text-[10px] text-foreground font-semibold">{displayName}</span>
+                <span className="text-[8px] text-muted-foreground truncate max-w-[200px]" title={h.message}>
+                  {h.message}
+                </span>
+              </div>
+              <span className={`px-1.5 py-0.5 rounded border font-bold text-[8px] tracking-wide uppercase ${toneClass}`}>
+                {h.severity === "INFO" ? "OK" : h.severity}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

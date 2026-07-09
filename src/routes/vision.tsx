@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { Video, ImageIcon, Maximize2, Minimize2, Activity, Wifi, Radio } from "lucide-react";
+import { Video, ImageIcon, Maximize2, Minimize2, Activity, Wifi, Radio, Power } from "lucide-react";
 import qrCodeImage from "../assets/qr.jpeg";
 
 import { useROVSocket } from "../hooks/useROVSocket";
@@ -82,8 +82,35 @@ function VisionCenter() {
     }
   };
 
+  const failsafe = socket.failsafeStatus;
+  const isEmergency = failsafe?.emergency_active;
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-background text-foreground select-none overflow-y-auto lg:overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-background text-foreground select-none overflow-y-auto lg:overflow-hidden relative">
+      {/* Emergency Stop Lockout Overlay */}
+      {isEmergency && (
+        <div className="absolute inset-0 bg-red-950/95 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-8 animate-fade-in">
+          <div className="w-20 h-20 rounded-full bg-red-500/20 border border-red-500 flex items-center justify-center mb-6 animate-pulse">
+            <Power size={40} className="text-red-500" />
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-wider text-red-500 uppercase mb-2">
+            Emergency Stop Active
+          </h1>
+          <p className="text-muted-foreground text-xs max-w-sm mb-6">
+            The ROV thrusters have been disarmed due to a critical safety event. Verify hardware and telemetry before clearing.
+          </p>
+          <div className="bg-black/40 border border-red-500/30 rounded-lg px-5 py-3.5 mb-6 font-mono text-left max-w-md w-full">
+            <div className="text-[9px] text-red-400 uppercase tracking-widest mb-1 font-bold">Watchdog Event Reason</div>
+            <div className="text-xs text-foreground">{failsafe?.emergency_reason || "Operator Triggered E-Stop"}</div>
+          </div>
+          <button
+            onClick={socket.sendClearEmergency}
+            className="px-6 py-2.5 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold rounded-md text-xs tracking-wider transition-all shadow-[0_0_15px_rgba(239,68,68,0.4)] cursor-pointer uppercase"
+          >
+            Clear Emergency State
+          </button>
+        </div>
+      )}
       {/* Top Information Bar */}
       <header className="h-13 shrink-0 border-b border-panel-border px-6 flex items-center justify-between bg-[color:var(--color-sidebar)] text-xs font-semibold tracking-wider uppercase backdrop-blur-md bg-opacity-80">
         <div className="flex items-center gap-2 text-accent">
