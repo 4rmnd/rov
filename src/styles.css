@@ -19,6 +19,7 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-data: var(--data);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-success: var(--success);
@@ -31,37 +32,33 @@
 }
 
 :root {
-  --radius: 0.4rem;
-  /* Background: hampir hitam, sedikit biru-navy seperti desain */
-  --background: oklch(0.10 0.015 245);
-  --foreground: oklch(0.93 0.01 245);
-  --card: oklch(0.13 0.018 245);
-  --card-foreground: oklch(0.93 0.01 245);
-  /* Panel: sedikit lebih terang dari background */
-  --panel: oklch(0.15 0.02 245);
-  --panel-border: oklch(0.22 0.025 245);
-  /* Accent: golden yellow seperti desain (kuning terang, bukan orange) */
-  --primary: oklch(0.83 0.19 80);
-  --primary-foreground: oklch(0.10 0.015 245);
-  --accent: oklch(0.83 0.19 80);
-  --accent-foreground: oklch(0.10 0.015 245);
-  --muted: oklch(0.20 0.02 245);
-  --muted-foreground: oklch(0.60 0.015 245);
-  /* Status colors lebih vivid seperti desain */
-  --success: oklch(0.74 0.22 145);
-  --danger: oklch(0.62 0.26 25);
-  --warning: oklch(0.83 0.19 85);
-  --border: oklch(0.22 0.025 245);
-  /* Sidebar: paling gelap */
-  --sidebar: oklch(0.08 0.012 245);
+  --radius: 0.5rem;
+  /* Background: navy laut-dalam yang hangat, bukan hitam pekat */
+  --background: oklch(0.17 0.035 252);
+  --foreground: oklch(0.94 0.012 250);
+  --card: oklch(0.20 0.032 250);
+  --card-foreground: oklch(0.94 0.012 250);
+  /* Panel: berlapis jelas dari background, bukan nyaris flat */
+  --panel: oklch(0.21 0.032 250);
+  --panel-border: oklch(0.31 0.035 250);
+  /* Accent: amber "signal buoy" — matang & tenang, bukan kuning neon */
+  --primary: oklch(0.78 0.15 65);
+  --primary-foreground: oklch(0.17 0.03 250);
+  --accent: oklch(0.78 0.15 65);
+  --accent-foreground: oklch(0.17 0.03 250);
+  /* Data: teal untuk angka telemetri terukur (depth, posisi, heading) */
+  --data: oklch(0.78 0.11 195);
+  --muted: oklch(0.27 0.03 250);
+  --muted-foreground: oklch(0.71 0.02 250);
+  --success: oklch(0.74 0.16 155);
+  --danger: oklch(0.64 0.22 25);
+  --warning: oklch(0.78 0.14 70);
+  --border: oklch(0.31 0.035 250);
+  /* Sidebar: paling gelap di antara permukaan lain */
+  --sidebar: oklch(0.13 0.028 250);
 }
 
 @layer base {
-  html {
-    /* Efek "zoom 75%" — semua ukuran rem Tailwind jadi 75% lebih kecil,
-       tapi h-screen / 100vh tetap benar mengisi layar penuh */
-    font-size: 75%;
-  }
   * { border-color: var(--color-border); }
   body {
     background-color: var(--color-background);
@@ -77,8 +74,8 @@
 }
 
 @utility label-caps {
-  font-size: 0.65rem;
-  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--color-muted-foreground);
   font-weight: 600;

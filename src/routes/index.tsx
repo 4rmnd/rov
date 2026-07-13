@@ -5,7 +5,6 @@ import {
   Play, RotateCcw, ToggleLeft, Wifi, Activity, Radio,
   Maximize2, Minimize2,
 } from "lucide-react";
-import poliwangiLogo from "../assets/Logo Poliwangi HD.png";
 import qrCodeImage from "../assets/qr.jpeg";
 import rovImage from "../assets/rov.png";
 
@@ -92,12 +91,12 @@ function Dashboard() {
             <h1 className="text-3xl font-extrabold tracking-wider text-red-500 uppercase mb-2">
               Emergency Stop Active
             </h1>
-            <p className="text-muted-foreground text-xs max-w-sm mb-6">
+            <p className="text-muted-foreground text-sm max-w-sm mb-6">
               The ROV thrusters have been disarmed due to a critical safety event. Verify hardware and telemetry before clearing.
             </p>
             <div className="bg-black/40 border border-red-500/30 rounded-lg px-5 py-3.5 mb-6 font-mono text-left max-w-md w-full">
-              <div className="text-[9px] text-red-400 uppercase tracking-widest mb-1 font-bold">Watchdog Event Reason</div>
-              <div className="text-xs text-foreground">{failsafe?.emergency_reason || "Operator Triggered E-Stop"}</div>
+              <div className="text-[10px] text-red-400 uppercase tracking-widest mb-1 font-bold">Watchdog Event Reason</div>
+              <div className="text-sm text-foreground">{failsafe?.emergency_reason || "Operator Triggered E-Stop"}</div>
             </div>
             <button
               onClick={socket.sendClearEmergency}
@@ -108,36 +107,10 @@ function Dashboard() {
           </div>
         )}
 
-        {/* Header */}
-        <header className="h-13 shrink-0 border-b border-panel-border px-6 flex items-center justify-between bg-[color:var(--color-sidebar)]">
-          <div className="flex items-center gap-4">
-            <img src={poliwangiLogo} alt="Poliwangi Logo" className="w-10 h-10 object-contain" />
-            <div>
-              <h1 className="text-lg font-bold tracking-wider">ROV DASHBOARD</h1>
-              <div className="text-[10px] text-muted-foreground tracking-wider">POLITEKNIK NEGERI BANYUWANGI</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-xs">
-            <div className="hidden lg:flex items-center gap-2">
-              <span className="label-caps">Team</span>
-              <span className="font-mono font-semibold">Ocean Explorer</span>
-            </div>
-            <div className="hidden xl:flex items-center gap-3">
-              <div className="w-8 h-8 rounded bg-panel border border-panel-border grid place-items-center text-[9px] text-muted-foreground">KKI</div>
-              <div className="w-8 h-8 rounded bg-panel border border-panel-border grid place-items-center text-[9px] text-muted-foreground">DS</div>
-              <div className="w-8 h-8 rounded bg-panel border border-panel-border grid place-items-center text-[9px] text-muted-foreground">BM</div>
-            </div>
-            <div className="text-right">
-              <div className="font-mono text-sm">{time}</div>
-              <div className="text-[10px] text-muted-foreground">{date}</div>
-            </div>
-          </div>
-        </header>
-
-        {/* Status Bar */}
-        <div className="shrink-0 border-b border-panel-border px-6 py-2 bg-[color:var(--color-sidebar)] flex items-center justify-between">
-          <div className="flex items-center divide-x divide-panel-border">
-            <div className="pr-5">
+        {/* Header + Status Bar (combined into one row to save vertical space) */}
+        <div className="h-12 shrink-0 border-b border-panel-border px-4 bg-[color:var(--color-sidebar)] flex items-center justify-between gap-3 overflow-x-auto">
+          <div className="flex items-center divide-x divide-panel-border shrink-0">
+            <div className="pr-3">
               <StatusRow
                 icon={<ToggleLeft size={13} />}
                 label="Mode"
@@ -145,7 +118,7 @@ function Dashboard() {
                 tone="accent"
               />
             </div>
-            <div className="px-5">
+            <div className="px-3">
               <StatusRow
                 icon={<Wifi size={13} />}
                 label="Connection"
@@ -153,7 +126,7 @@ function Dashboard() {
                 tone={socket.connected ? "success" : "danger"}
               />
             </div>
-            <div className="px-5">
+            <div className="px-3">
               <StatusRow
                 icon={<Activity size={13} />}
                 label="MAVLink"
@@ -161,7 +134,7 @@ function Dashboard() {
                 tone={socket.mavlinkConnected ? "success" : "danger"}
               />
             </div>
-            <div className="pl-5">
+            <div className="pl-3">
               <StatusRow
                 icon={<Radio size={13} />}
                 label="Thrusters"
@@ -171,43 +144,58 @@ function Dashboard() {
               />
             </div>
           </div>
+
+          <div className="hidden xl:flex items-center gap-3 text-xs shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="label-caps">Team</span>
+              <span className="font-mono font-semibold">Ocean Explorer</span>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-xs leading-none">{time}</div>
+              <div className="text-[10px] text-muted-foreground mt-1">{date}</div>
+            </div>
+          </div>
+
           <button
             onClick={socket.sendEmergencyStop}
-            className="flex items-center gap-2 bg-[color:var(--color-danger)] text-white font-bold px-4 py-1.5 rounded-md text-xs tracking-wider hover:opacity-90 transition-opacity cursor-pointer"
+            className="flex items-center gap-1.5 shrink-0 whitespace-nowrap bg-[color:var(--color-danger)] text-white font-bold px-3.5 py-1.5 rounded-lg text-[11px] tracking-wider hover:opacity-90 transition-opacity cursor-pointer"
           >
-            <Power size={13} /> EMERGENCY STOP
+            <Power size={12} className="shrink-0" /> EMERGENCY STOP
           </button>
         </div>
 
         {/* Content */}
-        <main className="flex-1 min-h-0 p-3 grid gap-3 grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px] overflow-hidden">
+        <main className="flex-1 min-h-0 p-2.5 grid gap-2.5 grid-cols-1 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_340px] overflow-hidden">
           {/* Left column */}
-          <div className="min-h-0 overflow-hidden flex flex-col gap-3">
-            {/* Cameras */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
-              <CameraCard
-                title="Camera 1"
-                subtitle="Front Cam"
-                streamUrl={streams?.front?.stream_url}
-                cameraKey="front"
-                lastResult={socket.lastCameraResult}
-              />
-              <CameraCard
-                title="Camera 2"
-                subtitle="Bottom Cam"
-                streamUrl={streams?.bottom?.stream_url}
-                cameraKey="bottom"
-                lastResult={socket.lastCameraResult}
-              />
+          <div className="min-h-0 flex flex-col gap-2.5">
+            {/* Scrollable: cameras + telemetry (only scrolls if the window is genuinely too short) */}
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2.5 pr-1">
+              {/* Cameras */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 flex-[3] min-h-[140px]">
+                <CameraCard
+                  title="Camera 1"
+                  subtitle="Front Cam"
+                  streamUrl={streams?.front?.stream_url}
+                  cameraKey="front"
+                  lastResult={socket.lastCameraResult}
+                />
+                <CameraCard
+                  title="Camera 2"
+                  subtitle="Bottom Cam"
+                  streamUrl={streams?.bottom?.stream_url}
+                  cameraKey="bottom"
+                  lastResult={socket.lastCameraResult}
+                />
+              </div>
+
+              {/* Altitude + Trajectory */}
+              <div className="flex-[2] min-h-[150px] grid grid-cols-1 md:grid-cols-[180px_1fr] gap-2.5">
+                <AltitudeCard depth={depthVal} />
+                <TrajectoryCard trajectory={socket.trajectory} />
+              </div>
             </div>
 
-            {/* Altitude + Trajectory */}
-            <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-3">
-              <AltitudeCard depth={depthVal} />
-              <TrajectoryCard trajectory={socket.trajectory} />
-            </div>
-
-            {/* Quick controls */}
+            {/* Quick controls — always pinned & visible, never scrolled out of view */}
             <QuickControls
               armed={!!socket.telemetry?.armed}
               mode={socket.telemetry?.mode ?? "MANUAL"}
@@ -220,7 +208,7 @@ function Dashboard() {
           </div>
 
           {/* Right column */}
-          <div className="min-h-0 overflow-y-auto pr-1 flex flex-col gap-3 scrollbar-thin">
+          <div className="min-h-0 overflow-y-auto pr-1 flex flex-col gap-2.5 scrollbar-thin">
             <QRPanel
               qrStatus={socket.qrStatus}
               dockAligned={socket.dockAligned}
@@ -241,7 +229,7 @@ function Dashboard() {
           </div>
         </main>
 
-        <footer className="shrink-0 border-t border-panel-border px-6 py-2 flex items-center justify-between text-[11px] text-muted-foreground">
+        <footer className="shrink-0 border-t border-panel-border px-6 py-2 flex items-center justify-between text-xs text-muted-foreground">
           <span>© 2026 Ocean Explorer · Politeknik Negeri Banyuwangi</span>
           <span className="font-mono">v1.0.0</span>
         </footer>
@@ -370,13 +358,13 @@ function CameraCard({
   };
 
   return (
-    <div className="panel overflow-hidden flex flex-col aspect-video">
+    <div className="panel overflow-hidden flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-panel-border shrink-0">
         <div>
           <div className="text-sm font-semibold">{title}</div>
-          <div className="text-[10px] text-muted-foreground tracking-wider">{subtitle.toUpperCase()}</div>
+          <div className="text-xs text-muted-foreground tracking-wide">{subtitle.toUpperCase()}</div>
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] font-bold text-[color:var(--color-success)]">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[color:var(--color-success)]">
           <span className="w-2 h-2 rounded-full bg-[color:var(--color-success)]" style={{ animation: "pulse-live 1.4s infinite" }} />
           LIVE
         </div>
@@ -395,41 +383,41 @@ function CameraCard({
         ) : (
           <div className="text-muted-foreground/40 text-xs tracking-widest">NO CAMERA FEED</div>
         )}
-        
+
         {isRecording && (
-          <div className="absolute top-2 left-2 font-mono text-[10px] text-red-500 bg-black/60 px-1.5 py-0.5 rounded flex items-center gap-1">
+          <div className="absolute top-2.5 left-2.5 font-mono text-[11px] text-red-500 bg-black/60 px-2 py-1 rounded flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
             REC
           </div>
         )}
 
         {statusMessage && (
-          <div className="absolute top-2 right-2 font-mono text-[9px] text-accent bg-black/80 px-2 py-0.5 rounded z-20">
+          <div className="absolute top-2.5 right-2.5 font-mono text-[10px] text-accent bg-black/80 px-2.5 py-1 rounded z-20">
             {statusMessage}
           </div>
         )}
 
-        <div className="absolute bottom-2 right-2 flex gap-1 z-25">
+        <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 z-25">
           <button
             onClick={handleToggleFullscreen}
             title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            className="w-7 h-7 grid place-items-center rounded bg-black/50 hover:bg-accent hover:text-accent-foreground text-white/80 transition-colors"
+            className="w-7 h-7 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors"
           >
-            {isFullscreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+            {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
           </button>
           <button
             onClick={handleScreenshot}
             title="Take Screenshot"
-            className="w-7 h-7 grid place-items-center rounded bg-black/50 hover:bg-accent hover:text-accent-foreground text-white/80 transition-colors"
+            className="w-7 h-7 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors"
           >
-            <ImageIcon size={11} />
+            <ImageIcon size={12} />
           </button>
           <button
             onClick={handleToggleRecord}
             title={isRecording ? "Stop Recording" : "Start Recording"}
-            className={`w-7 h-7 grid place-items-center rounded bg-black/50 hover:bg-accent hover:text-accent-foreground text-white/80 transition-colors ${isRecording ? "text-red-500" : ""}`}
+            className={`w-7 h-7 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors ${isRecording ? "text-red-500" : ""}`}
           >
-            <Video size={11} />
+            <Video size={12} />
           </button>
         </div>
       </div>
@@ -440,53 +428,50 @@ function CameraCard({
 function AltitudeCard({ depth }: { depth: number }) {
   const max = 2.0;
   const clampedDepth = Math.max(0, Math.min(max, depth));
-  const pointerY = 110 - (clampedDepth / max) * 100;
+  const waterTopY = 12 + (1 - clampedDepth / max) * 96;
 
   return (
-    <div className="panel p-3 flex flex-col h-full">
-      <div className="label-caps mb-1.5 shrink-0">Altitude / Depth</div>
-      <div className="flex gap-2 flex-1 items-center justify-between">
-        <div className="flex-1">
-          <div className="font-mono text-4xl font-bold text-accent leading-none">
+    <div className="panel p-2.5 flex flex-col h-full min-h-0 overflow-hidden">
+      <div className="label-caps mb-1.5 shrink-0">Depth Sounder</div>
+      <div className="flex-1 flex flex-col items-center justify-between min-h-0 gap-2">
+        <div className="text-center">
+          <div className="font-mono text-3xl font-bold text-[color:var(--color-data)] leading-none">
             {depth.toFixed(2)}
-            <span className="text-lg text-muted-foreground ml-1">m</span>
+            <span className="text-sm text-muted-foreground ml-1">m</span>
           </div>
-          <div className="label-caps mt-1.5">Depth from surface</div>
+          <div className="label-caps mt-1.5">Below surface</div>
         </div>
-        
-        {/* Vertical Ruler Gauge */}
-        <div className="w-20 self-stretch">
-          <svg viewBox="0 0 75 120" className="w-full h-full">
-            <line x1="18" y1="10" x2="18" y2="110" stroke="var(--color-panel-border)" strokeWidth="1.5" />
 
-            {/* Major Ticks */}
-            <line x1="10" y1="10" x2="18" y2="10" stroke="var(--color-muted-foreground)" strokeWidth="1.5" />
-            <text x="24" y="14" fill="var(--color-muted-foreground)" fontSize="11" fontFamily="monospace" fontWeight="bold">2.00</text>
+        {/* Analog depth sounder tube */}
+        <div className="w-14 flex-1 min-h-0">
+          <svg viewBox="0 0 60 120" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+            {/* Instrument tube */}
+            <rect x="14" y="10" width="20" height="100" rx="10" fill="oklch(0.14 0.028 250)" stroke="var(--color-panel-border)" strokeWidth="1.5" />
 
-            <line x1="10" y1="35" x2="18" y2="35" stroke="var(--color-muted-foreground)" strokeWidth="1.5" />
-            <text x="24" y="39" fill="var(--color-muted-foreground)" fontSize="11" fontFamily="monospace" fontWeight="bold">1.50</text>
-
-            <line x1="10" y1="60" x2="18" y2="60" stroke="var(--color-muted-foreground)" strokeWidth="1.5" />
-            <text x="24" y="64" fill="var(--color-muted-foreground)" fontSize="11" fontFamily="monospace" fontWeight="bold">1.00</text>
-
-            <line x1="10" y1="85" x2="18" y2="85" stroke="var(--color-muted-foreground)" strokeWidth="1.5" />
-            <text x="24" y="89" fill="var(--color-muted-foreground)" fontSize="11" fontFamily="monospace" fontWeight="bold">0.50</text>
-
-            <line x1="10" y1="110" x2="18" y2="110" stroke="var(--color-muted-foreground)" strokeWidth="1.5" />
-            <text x="24" y="114" fill="var(--color-muted-foreground)" fontSize="11" fontFamily="monospace" fontWeight="bold">0.00</text>
-
-            {/* Minor Ticks */}
-            <line x1="13" y1="22.5" x2="18" y2="22.5" stroke="var(--color-panel-border)" strokeWidth="1" />
-            <line x1="13" y1="47.5" x2="18" y2="47.5" stroke="var(--color-panel-border)" strokeWidth="1" />
-            <line x1="13" y1="72.5" x2="18" y2="72.5" stroke="var(--color-panel-border)" strokeWidth="1" />
-            <line x1="13" y1="97.5" x2="18" y2="97.5" stroke="var(--color-panel-border)" strokeWidth="1" />
-
-            {/* Dynamic Pointer */}
-            <polygon
-              points={`1,${pointerY - 4.5} 10,${pointerY} 1,${pointerY + 4.5}`}
-              fill="var(--color-accent)"
+            {/* Water column fill */}
+            <rect
+              x="15.5"
+              y={waterTopY}
+              width="17"
+              height={110 - waterTopY}
+              rx="8.5"
+              fill="var(--color-data)"
+              opacity="0.35"
             />
-            <line x1="10" y1={pointerY} x2="14" y2={pointerY} stroke="var(--color-accent)" strokeWidth="1.5" />
+            <line x1="15.5" y1={waterTopY} x2="32.5" y2={waterTopY} stroke="var(--color-data)" strokeWidth="2" />
+
+            {/* Scale ticks + labels */}
+            {[0, 0.5, 1.0, 1.5, 2.0].map((t) => {
+              const y = 12 + (1 - t / max) * 96;
+              return (
+                <g key={t}>
+                  <line x1="36" y1={y} x2="41" y2={y} stroke="var(--color-muted-foreground)" strokeWidth="1.5" />
+                  <text x="45" y={y + 3.5} fill="var(--color-muted-foreground)" fontSize="9" fontFamily="monospace" fontWeight="bold">
+                    {t.toFixed(1)}
+                  </text>
+                </g>
+              );
+            })}
           </svg>
         </div>
       </div>
@@ -525,17 +510,17 @@ function TrajectoryCard({ trajectory }: { trajectory: any }) {
   const currentZ = trajectory?.current_pos?.depth ?? 0;
 
   return (
-    <div className="panel p-3 flex flex-col h-full min-h-0">
+    <div className="panel p-2.5 flex flex-col h-full min-h-0 overflow-hidden">
       <div className="flex items-center justify-between mb-2 shrink-0">
         <div className="label-caps">Trajectory Map</div>
         <button
           onClick={handleReset}
-          className="text-[9px] font-mono border border-panel-border px-2 py-0.5 rounded hover:bg-accent hover:text-black transition-colors"
+          className="text-xs font-mono border border-panel-border px-2.5 py-1 rounded-md hover:bg-accent hover:text-[color:var(--color-accent-foreground)] transition-colors"
         >
           RESET ORIGIN
         </button>
       </div>
-      <div className="relative flex-1 min-h-0 bg-[oklch(0.15_0.03_250)] rounded border border-panel-border overflow-hidden">
+      <div className="relative flex-1 min-h-0 bg-[oklch(0.15_0.03_250)] rounded-lg border border-panel-border overflow-hidden">
         {/* Background Grid */}
         <svg className="absolute inset-0 w-full h-full">
           <defs>
@@ -550,12 +535,12 @@ function TrajectoryCard({ trajectory }: { trajectory: any }) {
         <svg viewBox="0 0 300 160" className="relative w-full h-full z-10 p-2">
           {/* Origin Marker */}
           <circle cx={originX} cy={originY} r="3.5" fill="#fff" opacity="0.4" />
-          
+
           {pathD && (
             <path
               d={pathD}
               fill="none"
-              stroke="var(--color-accent)"
+              stroke="var(--color-data)"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -574,7 +559,7 @@ function TrajectoryCard({ trajectory }: { trajectory: any }) {
           )}
         </svg>
       </div>
-      <div className="grid grid-cols-4 gap-2 mt-2 text-[10px]">
+      <div className="grid grid-cols-4 gap-2 mt-2 text-xs">
         <MiniStat label="X Pos" value={`${currentX.toFixed(2)}m`} />
         <MiniStat label="Y Pos" value={`${currentY.toFixed(2)}m`} />
         <MiniStat label="Z Pos" value={`${currentZ.toFixed(2)}m`} />
@@ -590,11 +575,11 @@ function MiniStat({ label, value, tone }: { label: string; value: string; tone?:
       ? "text-[color:var(--color-success)]"
       : tone === "danger"
       ? "text-[color:var(--color-danger)]"
-      : "text-accent";
+      : "text-[color:var(--color-data)]";
   return (
-    <div className="bg-panel border border-panel-border rounded px-2 py-1.5">
-      <div className="text-[9px] text-muted-foreground tracking-wider">{label.toUpperCase()}</div>
-      <div className={`font-mono font-bold ${toneClass}`}>{value}</div>
+    <div className="bg-panel border border-panel-border rounded-md px-2 py-1.5">
+      <div className="text-[9px] text-muted-foreground tracking-wide">{label.toUpperCase()}</div>
+      <div className={`font-mono font-bold text-xs ${toneClass}`}>{value}</div>
     </div>
   );
 }
@@ -648,52 +633,52 @@ function QuickControls({
   };
 
   return (
-    <div className="panel p-2 grid grid-cols-2 md:grid-cols-4 gap-2">
+    <div className="panel p-2.5 shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2.5">
       <button
         onClick={handleToggleArm}
-        className={`flex items-center justify-center gap-2 py-2 rounded border border-panel-border transition-colors font-semibold text-xs cursor-pointer ${
+        className={`flex items-center justify-center gap-2 py-2 px-2 rounded-lg border border-panel-border transition-colors font-semibold text-xs whitespace-nowrap cursor-pointer ${
           armed
             ? "bg-red-500/20 text-red-500 border-red-500/30"
-            : "bg-panel hover:bg-accent hover:text-black"
+            : "bg-panel hover:bg-accent hover:text-[color:var(--color-accent-foreground)]"
         }`}
       >
-        <Power size={13} />
+        <Power size={15} className="shrink-0" />
         <span>{armed ? "DISARM MOTOR" : "ARM MOTOR"}</span>
       </button>
 
       <button
         onClick={handleToggleMode}
-        className={`flex items-center justify-center gap-2 py-2 rounded border border-panel-border transition-colors font-semibold text-xs cursor-pointer ${
+        className={`flex items-center justify-center gap-2 py-2 px-2 rounded-lg border border-panel-border transition-colors font-semibold text-xs whitespace-nowrap cursor-pointer ${
           mode === "DEPTH_HOLD"
             ? "bg-accent/20 text-accent border-accent/30"
-            : "bg-panel hover:bg-accent hover:text-black"
+            : "bg-panel hover:bg-accent hover:text-[color:var(--color-accent-foreground)]"
         }`}
       >
-        <ToggleLeft size={13} />
+        <ToggleLeft size={15} className="shrink-0" />
         <span>{mode === "DEPTH_HOLD" ? "MODE: DEPTH HOLD" : "MODE: MANUAL"}</span>
       </button>
 
       <button
         onClick={handleToggleLight}
-        className={`flex items-center justify-center gap-2 py-2 rounded border border-panel-border transition-colors font-semibold text-xs cursor-pointer ${
+        className={`flex items-center justify-center gap-2 py-2 px-2 rounded-lg border border-panel-border transition-colors font-semibold text-xs whitespace-nowrap cursor-pointer ${
           lightState
             ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30"
-            : "bg-panel hover:bg-accent hover:text-black"
+            : "bg-panel hover:bg-accent hover:text-[color:var(--color-accent-foreground)]"
         }`}
       >
-        <Play size={13} />
+        <Play size={15} className="shrink-0" />
         <span>{lightState ? "LIGHT: ON" : "LIGHT: OFF"}</span>
       </button>
 
       <button
         onClick={handleToggleGripper}
-        className={`flex items-center justify-center gap-2 py-2 rounded border border-panel-border transition-colors font-semibold text-xs cursor-pointer ${
+        className={`flex items-center justify-center gap-2 py-2 px-2 rounded-lg border border-panel-border transition-colors font-semibold text-xs whitespace-nowrap cursor-pointer ${
           gripperState
             ? "bg-green-500/20 text-green-500 border-green-500/30"
-            : "bg-panel hover:bg-accent hover:text-black"
+            : "bg-panel hover:bg-accent hover:text-[color:var(--color-accent-foreground)]"
         }`}
       >
-        <RotateCcw size={13} />
+        <RotateCcw size={15} className="shrink-0" />
         <span>{gripperState ? "GRIPPER: OPEN" : "GRIPPER: CLOSE"}</span>
       </button>
     </div>
@@ -712,20 +697,20 @@ function QRPanel({
   onClearHistory: () => void;
 }) {
   return (
-    <div className="panel p-3 flex flex-col min-h-0">
+    <div className="panel p-2.5 flex flex-col shrink-0">
       <div className="flex items-center justify-between mb-2 shrink-0">
         <div className="label-caps">QR Detection & Docking</div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {qrHistory.length > 0 && (
             <button
               onClick={onClearHistory}
-              className="text-[9px] font-mono border border-panel-border px-2 py-0.5 rounded hover:bg-red-500/20 hover:text-red-500 transition-colors cursor-pointer"
+              className="text-[10px] font-mono border border-panel-border px-2 py-0.5 rounded-md hover:bg-red-500/20 hover:text-red-500 transition-colors cursor-pointer"
             >
               CLEAR
             </button>
           )}
           <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
               dockAligned
                 ? "bg-[color:var(--color-success)]/20 text-[color:var(--color-success)]"
                 : qrStatus?.data
@@ -737,9 +722,9 @@ function QRPanel({
           </span>
         </div>
       </div>
-      
-      <div className="grid grid-cols-[80px_1fr] gap-3 items-center shrink-0 border-b border-panel-border/50 pb-3">
-        <div className="aspect-square bg-white p-1 rounded overflow-hidden grid place-items-center">
+
+      <div className="grid grid-cols-[70px_1fr] gap-2.5 items-center shrink-0 border-b border-panel-border/50 pb-2.5">
+        <div className="aspect-square bg-white p-1 rounded-md overflow-hidden grid place-items-center">
           <img
             src={qrCodeImage}
             alt="Detected QR Code"
@@ -763,16 +748,16 @@ function QRPanel({
       </div>
 
       {/* History List */}
-      <div className="flex-1 min-h-0 mt-2 flex flex-col">
-        <div className="text-[10px] text-muted-foreground tracking-wider font-semibold mb-1.5">DETECTION HISTORY</div>
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 font-mono text-[10px]">
+      <div className="mt-2 flex flex-col">
+        <div className="text-[11px] text-muted-foreground tracking-wide font-semibold mb-1.5">DETECTION HISTORY</div>
+        <div className="max-h-28 overflow-y-auto space-y-1 pr-1 font-mono text-[11px]">
           {qrHistory.length === 0 ? (
             <div className="text-muted-foreground/50 italic text-center py-4">No history data</div>
           ) : (
             qrHistory.slice().reverse().map((item, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between py-1 border-b border-panel-border/30 last:border-0"
+                className="flex items-center justify-between py-1.5 border-b border-panel-border/30 last:border-0"
               >
                 <span className="truncate max-w-[120px] font-semibold text-accent">{item.data}</span>
                 <div className="flex items-center gap-2">
@@ -798,14 +783,14 @@ function ROVDesignPanel({ orientation }: { orientation: any }) {
   const roll = orientation?.roll ?? 0;
 
   return (
-    <div className="panel p-3 flex-1 flex flex-col min-h-0">
+    <div className="panel p-2.5 flex flex-col shrink-0">
       <div className="label-caps mb-2 shrink-0">ROV Orientation & Axis</div>
-      <div className="flex-1 min-h-0 grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
 
         {/* Left: ROV Image */}
-        <div className="flex flex-col gap-1 min-h-0">
-          <div className="text-[8px] tracking-widest text-muted-foreground font-semibold uppercase">Attitude Indicator</div>
-          <div className="flex-1 min-h-0 bg-[oklch(0.10_0.02_245)] rounded border border-panel-border overflow-hidden grid place-items-center relative">
+        <div className="flex flex-col gap-1">
+          <div className="text-[9px] tracking-wide text-muted-foreground font-semibold uppercase">Attitude Indicator</div>
+          <div className="aspect-square bg-[oklch(0.14_0.028_250)] rounded-lg border border-panel-border overflow-hidden grid place-items-center relative">
             <img
               src={rovImage}
               alt="ROV 3D Model"
@@ -815,25 +800,25 @@ function ROVDesignPanel({ orientation }: { orientation: any }) {
                 transition: "transform 0.1s ease-out",
               }}
             />
-            <div className="absolute bottom-1 left-2 text-[8px] font-mono text-muted-foreground">
+            <div className="absolute bottom-1.5 left-2 text-[10px] font-mono text-muted-foreground">
               R: {roll.toFixed(1)}° P: {pitch.toFixed(1)}°
             </div>
           </div>
         </div>
 
         {/* Right: Axis Indicator */}
-        <div className="flex flex-col gap-1 min-h-0">
-          <div className="text-[8px] tracking-widest text-muted-foreground font-semibold uppercase">Compass (Yaw)</div>
-          <div className="flex-1 min-h-0 bg-[oklch(0.10_0.02_245)] rounded border border-panel-border overflow-hidden grid place-items-center relative">
+        <div className="flex flex-col gap-1">
+          <div className="text-[9px] tracking-wide text-muted-foreground font-semibold uppercase">Compass (Yaw)</div>
+          <div className="aspect-square bg-[oklch(0.14_0.028_250)] rounded-lg border border-panel-border overflow-hidden grid place-items-center relative">
             <svg viewBox="0 0 100 100" className="w-full h-full p-2">
               <g transform={`rotate(${yaw}, 50, 50)`} style={{ transition: "transform 0.1s ease-out" }}>
                 {/* Compass Circle */}
                 <circle cx="50" cy="50" r="30" fill="none" stroke="var(--color-panel-border)" strokeWidth="1.5" />
-                
+
                 {/* Pointer / North Indicator */}
-                <polygon points="50,15 45,25 55,25" fill="var(--color-accent)" />
-                <text x="50" y="35" fontSize="8" stroke="none" fill="var(--color-accent)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">N</text>
-                
+                <polygon points="50,15 45,25 55,25" fill="var(--color-data)" />
+                <text x="50" y="35" fontSize="8" stroke="none" fill="var(--color-data)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">N</text>
+
                 {/* Axis lines */}
                 <line x1="50" y1="25" x2="50" y2="75" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2" />
                 <line x1="25" y1="50" x2="75" y2="50" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2" />
@@ -841,7 +826,7 @@ function ROVDesignPanel({ orientation }: { orientation: any }) {
               {/* Center point */}
               <circle cx="50" cy="50" r="3" fill="#fff" />
             </svg>
-            <div className="absolute bottom-1 right-2 text-[8px] font-mono text-muted-foreground">
+            <div className="absolute bottom-1.5 right-2 text-[10px] font-mono text-muted-foreground">
               HDG: {yaw.toFixed(1)}°
             </div>
           </div>
@@ -866,11 +851,11 @@ function InformationPanel({
   const armed = telemetry?.armed ?? false;
 
   return (
-    <div className="panel p-3">
+    <div className="panel p-2.5">
       <div className="label-caps mb-2">System Telemetry</div>
       <div className="space-y-1.5 text-xs">
-        <Field label="Depth" value={`${depth.toFixed(2)} m`} mono accent />
-        <Field label="Battery" value={`${batteryVoltage.toFixed(1)} V (${batteryRemaining}%)`} mono accent />
+        <Field label="Depth" value={`${depth.toFixed(2)} m`} mono data />
+        <Field label="Battery" value={`${batteryVoltage.toFixed(1)} V (${batteryRemaining}%)`} mono data />
         <Field label="Flight Mode" value={mode} />
         <Field label="Thrusters" value={armed ? "ARMED" : "DISARMED"} accent={armed} />
         <Field label="MAVLink State" value={mavlinkConnected ? "CONNECTED" : "DISCONNECTED"} />
@@ -884,16 +869,23 @@ function Field({
   value,
   mono,
   accent,
+  data,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   accent?: boolean;
+  data?: boolean;
 }) {
+  const toneClass = data
+    ? "text-[color:var(--color-data)] font-bold"
+    : accent
+    ? "text-accent font-bold"
+    : "text-foreground";
   return (
     <div className="flex items-center justify-between border-b border-panel-border/50 pb-1.5 last:border-0">
       <span className="label-caps">{label}</span>
-      <span className={`${mono ? "font-mono" : ""} ${accent ? "text-accent font-bold" : "text-foreground"} text-xs`}>
+      <span className={`${mono ? "font-mono" : ""} ${toneClass} text-xs`}>
         {value}
       </span>
     </div>
@@ -941,13 +933,13 @@ function AutonomousPanel({
   };
 
   return (
-    <div className="panel p-3 flex flex-col gap-3">
+    <div className="panel p-2.5 flex flex-col gap-2.5">
       <div className="flex items-center justify-between border-b border-panel-border/50 pb-2">
         <span className="label-caps">Semi-Autonomous Mission</span>
         <span
-          className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
             isActive
-              ? "bg-accent/20 text-accent animate-pulse"
+              ? "bg-accent/20 text-accent"
               : "bg-panel-border/30 text-muted-foreground"
           }`}
         >
@@ -955,9 +947,9 @@ function AutonomousPanel({
         </span>
       </div>
 
-      <div className="space-y-2 text-xs">
+      <div className="space-y-2.5 text-xs">
         <div className="flex flex-col gap-1">
-          <label className="text-[9px] text-muted-foreground uppercase tracking-wider font-semibold">Target Station ID</label>
+          <label className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">Target Station ID</label>
           <div className="flex gap-1.5">
             <input
               type="text"
@@ -965,51 +957,51 @@ function AutonomousPanel({
               onChange={(e) => setTargetId(e.target.value)}
               disabled={isActive}
               placeholder="e.g. DOCK_A"
-              className="flex-1 bg-panel border border-panel-border rounded px-2.5 py-1 font-mono text-xs text-foreground focus:outline-none focus:border-accent disabled:opacity-50"
+              className="flex-1 bg-panel border border-panel-border rounded-md px-2.5 py-1 font-mono text-xs text-foreground focus:outline-none focus:border-accent disabled:opacity-50"
             />
             <button
               onClick={handleSetTarget}
               disabled={isActive || isSavingTarget}
-              className="px-2.5 py-1 bg-panel hover:bg-accent hover:text-black border border-panel-border rounded text-[10px] font-bold cursor-pointer transition-colors disabled:opacity-50"
+              className="px-2.5 py-1 bg-panel hover:bg-accent hover:text-[color:var(--color-accent-foreground)] border border-panel-border rounded-md text-[11px] font-bold cursor-pointer transition-colors disabled:opacity-50"
             >
               {isSavingTarget ? "Saving..." : "Set Target"}
             </button>
           </div>
           {saveMessage && (
-            <span className="text-[9px] font-mono text-accent mt-0.5">{saveMessage}</span>
+            <span className="text-[11px] font-mono text-accent mt-0.5">{saveMessage}</span>
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 pt-1.5">
+        <div className="grid grid-cols-2 gap-2 pt-0.5">
           <button
             onClick={() => onStart(targetId)}
             disabled={isActive}
-            className="flex items-center justify-center gap-1.5 py-1.5 rounded bg-accent hover:bg-accent/80 text-black font-bold text-xs tracking-wider cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent hover:bg-accent/80 text-[color:var(--color-accent-foreground)] font-bold text-[11px] tracking-wider cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Play size={12} fill="currentColor" /> START MISSION
           </button>
           <button
             onClick={onStop}
             disabled={!isActive}
-            className="flex items-center justify-center gap-1.5 py-1.5 rounded bg-red-500/20 hover:bg-red-500 hover:text-white border border-red-500/30 text-red-400 font-bold text-xs tracking-wider cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500 hover:text-white border border-red-500/30 text-red-400 font-bold text-[11px] tracking-wider cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Power size={12} /> ABORT MISSION
           </button>
         </div>
 
         {isActive && (
-          <div className="bg-[oklch(0.12_0.02_245)] border border-panel-border/60 rounded-md p-2.5 space-y-1.5 font-mono text-[10px] mt-1">
-            <div className="flex justify-between border-b border-panel-border/10 pb-1">
-              <span className="text-muted-foreground uppercase text-[9px]">Mission Stage</span>
+          <div className="bg-[oklch(0.15_0.028_250)] border border-panel-border/60 rounded-lg p-2.5 space-y-1.5 font-mono text-[10px] mt-1">
+            <div className="flex justify-between border-b border-panel-border/10 pb-1.5">
+              <span className="text-muted-foreground uppercase text-[10px]">Mission Stage</span>
               <span className="text-accent font-bold">{status?.state}</span>
             </div>
-            <div className="flex justify-between border-b border-panel-border/10 pb-1">
-              <span className="text-muted-foreground uppercase text-[9px]">Elapsed Time</span>
+            <div className="flex justify-between border-b border-panel-border/10 pb-1.5">
+              <span className="text-muted-foreground uppercase text-[10px]">Elapsed Time</span>
               <span className="text-foreground">{status?.elapsed_s} s</span>
             </div>
             {(status?.waypoint_index !== undefined) && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground uppercase text-[9px]">Waypoint Progress</span>
+                <span className="text-muted-foreground uppercase text-[10px]">Waypoint Progress</span>
                 <span className="text-foreground">
                   {status?.waypoint_index} / {status?.waypoint_total || "?"}
                 </span>
@@ -1025,9 +1017,9 @@ function AutonomousPanel({
 function FailsafePanel({ status }: { status: any }) {
   if (!status) {
     return (
-      <div className="panel p-3">
+      <div className="panel p-2.5">
         <div className="label-caps mb-2">Failsafe System Health</div>
-        <div className="text-muted-foreground/30 text-xs italic text-center py-4 font-mono">
+        <div className="text-muted-foreground/30 text-sm italic text-center py-4 font-mono">
           Waiting for security heartbeat...
         </div>
       </div>
@@ -1037,11 +1029,11 @@ function FailsafePanel({ status }: { status: any }) {
   const subsystems = status.subsystems || {};
 
   return (
-    <div className="panel p-3 flex flex-col gap-3">
+    <div className="panel p-2.5 flex flex-col gap-2.5">
       <div className="flex items-center justify-between border-b border-panel-border/50 pb-2">
         <span className="label-caps">Security Watchdog L1</span>
         <span
-          className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
             status.emergency_active
               ? "bg-red-500/20 text-red-500 animate-pulse"
               : "bg-green-500/10 text-green-400"
@@ -1075,11 +1067,11 @@ function FailsafePanel({ status }: { status: any }) {
             >
               <div className="flex flex-col">
                 <span className="text-[10px] text-foreground font-semibold">{displayName}</span>
-                <span className="text-[8px] text-muted-foreground truncate max-w-[200px]" title={h.message}>
+                <span className="text-[9px] text-muted-foreground truncate max-w-[200px]" title={h.message}>
                   {h.message}
                 </span>
               </div>
-              <span className={`px-1.5 py-0.5 rounded border font-bold text-[8px] tracking-wide uppercase ${toneClass}`}>
+              <span className={`px-1.5 py-0.5 rounded-md border font-bold text-[9px] tracking-wide uppercase ${toneClass}`}>
                 {h.severity === "INFO" ? "OK" : h.severity}
               </span>
             </div>

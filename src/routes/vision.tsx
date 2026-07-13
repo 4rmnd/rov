@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { Video, ImageIcon, Maximize2, Minimize2, Activity, Wifi, Radio, Power } from "lucide-react";
+import { Video, ImageIcon, Maximize2, Minimize2, Wifi, Radio, Power, ScanLine } from "lucide-react";
 import qrCodeImage from "../assets/qr.jpeg";
 
 import { useROVSocket } from "../hooks/useROVSocket";
@@ -100,7 +100,7 @@ function VisionCenter() {
             The ROV thrusters have been disarmed due to a critical safety event. Verify hardware and telemetry before clearing.
           </p>
           <div className="bg-black/40 border border-red-500/30 rounded-lg px-5 py-3.5 mb-6 font-mono text-left max-w-md w-full">
-            <div className="text-[9px] text-red-400 uppercase tracking-widest mb-1 font-bold">Watchdog Event Reason</div>
+            <div className="text-[10px] text-red-400 uppercase tracking-widest mb-1 font-bold">Watchdog Event Reason</div>
             <div className="text-xs text-foreground">{failsafe?.emergency_reason || "Operator Triggered E-Stop"}</div>
           </div>
           <button
@@ -111,31 +111,29 @@ function VisionCenter() {
           </button>
         </div>
       )}
-      {/* Top Information Bar */}
-      <header className="h-13 shrink-0 border-b border-panel-border px-6 flex items-center justify-between bg-[color:var(--color-sidebar)] text-xs font-semibold tracking-wider uppercase backdrop-blur-md bg-opacity-80">
-        <div className="flex items-center gap-2 text-accent">
-          <span className="text-muted-foreground font-medium">Team:</span>
-          <span className="font-mono">{socket.connected ? "Ocean Explorer" : "Offline Mode"}</span>
+      {/* Top Bar */}
+      <header className="h-12 shrink-0 border-b border-panel-border px-4 flex items-center justify-between bg-[color:var(--color-sidebar)] gap-3">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="label-caps">Team</span>
+          <span className="font-mono font-semibold">{socket.connected ? "Ocean Explorer" : "Offline Mode"}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground font-medium">University:</span>
-          <span className="text-foreground tracking-wide font-sans">Politeknik Negeri Banyuwangi</span>
+        <div className="hidden md:flex items-center gap-2 text-xs">
+          <span className="label-caps">University</span>
+          <span className="text-foreground">Politeknik Negeri Banyuwangi</span>
         </div>
-        <div className="flex items-center gap-2 text-right font-mono">
-          <span className="text-muted-foreground font-medium">{dayName},</span>
-          <span className="text-accent">{dateStr}</span>
-          <span className="text-muted-foreground">|</span>
-          <span className="text-foreground font-bold">{timeStr}</span>
+        <div className="text-right">
+          <div className="font-mono text-xs leading-none">{timeStr}</div>
+          <div className="text-[10px] text-muted-foreground mt-1">{dayName}, {dateStr}</div>
         </div>
       </header>
 
       {/* Main Layout: cameras side-by-side on left, QR panel on right */}
-      <div className="flex-1 min-h-0 p-4 flex flex-col lg:flex-row gap-4 overflow-y-auto lg:overflow-hidden">
+      <div className="flex-1 min-h-0 p-2.5 flex flex-col lg:flex-row gap-2.5 overflow-y-auto lg:overflow-hidden">
 
-        {/* Left: Camera 1 & Camera 2 side by side, full height */}
-        <div className="flex-1 min-h-0 flex flex-row gap-4">
+        {/* Left: Camera 1 & Camera 2 stacked on mobile, side-by-side on large screens */}
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-2.5">
           {/* Camera 1 (Front Cam) */}
-          <div className="flex-1 min-h-0 h-full">
+          <div className="flex-1 min-h-[260px] lg:min-h-0 h-full">
             <CameraCard
               title="Camera 1"
               subtitle="Front Cam Stream"
@@ -147,7 +145,7 @@ function VisionCenter() {
           </div>
 
           {/* Camera 2 (Bottom / Side Cam) */}
-          <div className="flex-1 min-h-0 h-full">
+          <div className="flex-1 min-h-[260px] lg:min-h-0 h-full">
             <CameraCard
               title="Camera 2"
               subtitle="Bottom / Side Cam Stream"
@@ -160,19 +158,16 @@ function VisionCenter() {
         </div>
 
         {/* Right: QR Code Detection Panel */}
-        <div className="panel flex flex-col w-full lg:w-[340px] shrink-0 min-h-[400px] lg:h-full p-5 justify-between bg-gradient-to-b from-card/60 to-card/10 border border-panel-border/80 rounded-lg backdrop-blur-sm shadow-xl">
-          <div className="flex flex-col gap-4 min-h-0 flex-1">
+        <div className="panel flex flex-col w-full lg:w-[300px] shrink-0 min-h-[380px] lg:h-full p-3 justify-between">
+          <div className="flex flex-col gap-2.5 min-h-0 flex-1">
             {/* Title block */}
-            <div className="flex items-center justify-between border-b border-panel-border/60 pb-3 shrink-0">
-              <div className="flex items-center gap-2">
-                <Activity size={14} className="text-accent animate-pulse" />
-                <span className="label-caps">QR Target Analyzer</span>
-              </div>
+            <div className="flex items-center justify-between border-b border-panel-border/60 pb-2 shrink-0">
+              <span className="label-caps">QR Target Analyzer</span>
               <span
-                className={`text-[9px] font-mono font-bold px-2.5 py-0.5 rounded-full border ${
+                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${
                   socket.qrStatus?.data
-                    ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30 animate-pulse"
-                    : "bg-panel-border/20 text-muted-foreground border-panel-border/40"
+                    ? "bg-yellow-500/15 text-yellow-400"
+                    : "bg-panel-border/30 text-muted-foreground"
                 }`}
               >
                 {socket.qrStatus?.data ? "TARGET LOCKED" : "NO TARGET"}
@@ -180,59 +175,57 @@ function VisionCenter() {
             </div>
 
             {/* Target visual scan block */}
-            <div className="flex flex-col items-center gap-4 bg-[oklch(0.12_0.02_245)] p-4 rounded-lg border border-panel-border/50 relative overflow-hidden shrink-0">
-              {/* Animated Scan Line */}
-              {socket.qrStatus?.data && (
-                <div className="absolute left-0 right-0 h-0.5 bg-accent/40 shadow-[0_0_8px_var(--color-accent)] animate-[bounce_2.5s_infinite] pointer-events-none" />
-              )}
-              
-              <div className="w-24 h-24 bg-white/5 p-1 rounded-lg border-2 border-dashed border-panel-border flex items-center justify-center relative group overflow-hidden bg-black/40">
+            <div className="flex flex-col items-center gap-2.5 bg-[oklch(0.15_0.028_250)] p-2.5 rounded-lg border border-panel-border/60 shrink-0">
+              <div className="w-20 h-20 bg-white p-1 rounded-lg overflow-hidden">
                 <img
                   src={qrCodeImage}
                   alt="Target QR"
-                  className="w-full h-full object-cover opacity-80"
+                  className="w-full h-full object-cover opacity-85"
                 />
-                <div className="absolute inset-0 bg-accent/5 border border-accent/25 rounded-md pointer-events-none" />
               </div>
 
-              <div className="w-full space-y-2.5 text-xs font-mono">
-                <div className="flex justify-between border-b border-panel-border/10 pb-1.5">
-                  <span className="text-muted-foreground uppercase text-[9px] tracking-wider">Target Side</span>
-                  <span className="text-accent font-bold text-sm tracking-wide">{qrSide}</span>
+              <div className="w-full space-y-1.5 text-xs">
+                <div className="flex justify-between items-center border-b border-panel-border/20 pb-1.5">
+                  <span className="label-caps">Target Side</span>
+                  <span className="text-[color:var(--color-data)] font-bold font-mono">{qrSide}</span>
                 </div>
-                <div className="flex justify-between border-b border-panel-border/10 pb-1.5">
-                  <span className="text-muted-foreground uppercase text-[9px] tracking-wider">Dock Alignment</span>
+                <div className="flex justify-between items-center">
+                  <span className="label-caps">Dock Alignment</span>
                   <span
                     className={`font-bold flex items-center gap-1.5 ${
                       qrValid ? "text-[color:var(--color-success)]" : "text-yellow-500"
                     }`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${qrValid ? "bg-[color:var(--color-success)]" : "bg-yellow-500"} animate-pulse`} />
-                    {qrValid ? "VALID (Ready to Dock)" : socket.qrStatus?.data ? "INVALID (Centering)" : "NOT DETECTED"}
+                    <span className={`w-1.5 h-1.5 rounded-full ${qrValid ? "bg-[color:var(--color-success)]" : "bg-yellow-500"}`} />
+                    {qrValid ? "Valid" : socket.qrStatus?.data ? "Centering" : "Not detected"}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Detection History logs */}
-            <div className="flex-1 flex flex-col min-h-0 mt-2 overflow-hidden">
-              <div className="flex items-center justify-between mb-2 shrink-0">
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+            <div className="flex-1 flex flex-col min-h-0 mt-1 overflow-hidden">
+              <div className="flex items-center justify-between mb-1.5 shrink-0">
+                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
                   Realtime Detections
                 </span>
                 {qrHistory.length > 0 && (
                   <button
                     onClick={handleClearHistory}
-                    className="text-[8px] font-mono border border-panel-border/80 px-2 py-0.5 rounded hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/40 transition-colors hover:cursor-pointer uppercase tracking-wider"
+                    className="text-[10px] font-mono border border-panel-border px-2 py-0.5 rounded-md hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer"
                   >
-                    Clear Logs
+                    Clear
                   </button>
                 )}
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px] scrollbar-thin">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1 font-mono text-[11px]">
                 {qrHistory.length === 0 ? (
-                  <div className="text-muted-foreground/30 italic text-center py-8">
-                    No scanning data logged
+                  <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-4">
+                    <ScanLine size={22} className="text-muted-foreground/30" />
+                    <div className="text-muted-foreground/50 italic">No scanning data logged</div>
+                    <div className="text-muted-foreground/30 text-[10px] not-italic">
+                      Detections will appear here once a QR code is scanned
+                    </div>
                   </div>
                 ) : (
                   qrHistory
@@ -241,14 +234,14 @@ function VisionCenter() {
                     .map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between bg-panel/30 border border-panel-border/40 rounded p-2 hover:bg-accent/5 hover:border-accent/20 transition-all"
+                        className="flex items-center justify-between bg-panel/40 border border-panel-border/40 rounded-md px-2 py-1.5"
                       >
-                        <span className="text-accent font-semibold truncate max-w-[130px]">{item.data}</span>
+                        <span className="text-accent font-semibold truncate max-w-[110px]">{item.data}</span>
                         <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.2 rounded text-[9px] ${item.aligned ? "text-green-400 bg-green-500/10" : "text-yellow-400 bg-yellow-500/10"}`}>
+                          <span className={item.aligned ? "text-green-400" : "text-yellow-400"}>
                             {item.aligned ? "Aligned" : "Detect"}
                           </span>
-                          <span className="text-muted-foreground/50">
+                          <span className="text-muted-foreground/60">
                             {item.received_at ? new Date(item.received_at).toLocaleTimeString("en-GB") : ""}
                           </span>
                         </div>
@@ -258,28 +251,23 @@ function VisionCenter() {
               </div>
             </div>
           </div>
-
-          <div className="border-t border-panel-border/40 pt-3 mt-4 shrink-0 font-mono text-[9px] text-muted-foreground flex justify-between">
-            <span>Scan Protocol:</span>
-            <span>CV-HOUGH-QR</span>
-          </div>
         </div>
       </div>
 
       {/* Footer Status Bar */}
-      <footer className="h-11 shrink-0 border-t border-panel-border px-6 py-2 bg-[color:var(--color-sidebar)] flex items-center justify-between text-[11px] backdrop-blur-md bg-opacity-80">
-        <div className="flex items-center gap-6">
+      <footer className="h-10 shrink-0 border-t border-panel-border px-4 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-5">
           <div className="flex items-center gap-1.5">
-            <Radio size={12} className="text-accent animate-pulse" />
-            <span className="text-muted-foreground font-semibold uppercase">Mode:</span>
+            <Radio size={12} className="text-accent" />
+            <span className="label-caps">Mode</span>
             <span className="font-mono text-accent font-bold">{socket.telemetry?.mode ?? "MANUAL"}</span>
           </div>
-          <div className="h-4 w-px bg-panel-border/60" />
+          <div className="h-3.5 w-px bg-panel-border/60" />
           <div className="flex items-center gap-1.5">
             <Wifi size={12} className={socket.connected ? "text-[color:var(--color-success)]" : "text-red-500"} />
-            <span className="text-muted-foreground font-semibold uppercase">Connection:</span>
+            <span className="label-caps">Connection</span>
             <span
-              className={`font-mono font-bold flex items-center gap-1.5 ${
+              className={`font-mono font-bold ${
                 socket.connected ? "text-[color:var(--color-success)]" : "text-red-500"
               }`}
             >
@@ -288,7 +276,7 @@ function VisionCenter() {
           </div>
         </div>
 
-        <div className="font-mono text-[10px] text-muted-foreground flex items-center gap-4">
+        <div className="font-mono text-[11px] text-muted-foreground hidden md:flex items-center gap-4">
           <span>Cam Service: Port 8001/8002</span>
           <span>Ocean Explorer v1.0.0</span>
         </div>
@@ -316,6 +304,11 @@ function CameraCard({
   const [statusMessage, setStatusMessage] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [streamError, setStreamError] = useState(false);
+
+  useEffect(() => {
+    setStreamError(false);
+  }, [streamUrl]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -382,111 +375,78 @@ function CameraCard({
   const pitch = telemetry?.pitch ?? 0;
 
   return (
-    <div className="panel overflow-hidden flex flex-col h-full bg-card/45 border border-panel-border/80 rounded-lg shadow-lg relative min-w-0">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-panel-border/60 bg-panel/30 shrink-0">
+    <div className="panel overflow-hidden flex flex-col h-full min-w-0 min-h-[260px] lg:min-h-0">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-panel-border shrink-0">
         <div>
-          <div className="text-sm font-semibold tracking-wide text-foreground">{title}</div>
-          <div className="text-[10px] text-muted-foreground tracking-wider uppercase font-mono">{subtitle}</div>
+          <div className="text-sm font-semibold">{title}</div>
+          <div className="text-xs text-muted-foreground tracking-wide">{subtitle.toUpperCase()}</div>
         </div>
-        <div className="flex items-center gap-1.5 text-[9px] font-mono font-bold text-[color:var(--color-success)] bg-[color:var(--color-success)]/10 border border-[color:var(--color-success)]/20 px-2 py-0.5 rounded">
-          <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-success)] animate-pulse" />
-          LIVE FEED
-        </div>
+        {streamUrl && !streamError ? (
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[color:var(--color-success)]">
+            <span className="w-2 h-2 rounded-full bg-[color:var(--color-success)]" style={{ animation: "pulse-live 1.4s infinite" }} />
+            LIVE
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
+            <span className="w-2 h-2 rounded-full bg-muted-foreground/50" />
+            NO SIGNAL
+          </div>
+        )}
       </div>
 
-      <div ref={containerRef} className="relative flex-1 min-h-0 bg-black grid place-items-center overflow-hidden group">
-        
-        {/* HUD Grid Overlay Scanline */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_4px,6px_100%] pointer-events-none z-10 opacity-45" />
-
-        {/* HUD Crosshair lines */}
-        <div className="absolute inset-0 pointer-events-none z-10">
-          {/* HUD corners */}
-          <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-accent/40" />
-          <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-accent/40" />
-          <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-accent/40" />
-          <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-accent/40" />
-          
-          {/* Centering crosshairs */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-            <div className="w-8 h-px bg-accent/30" />
-            <div className="h-8 w-px bg-accent/30 absolute" />
-            <div className="absolute w-6 h-6 rounded-full border border-accent/25 pointer-events-none" />
-          </div>
-
-          {/* Subsea pitch visual bars */}
-          <div className="absolute right-6 top-1/4 bottom-1/4 w-4 flex flex-col justify-between font-mono text-[8px] text-accent/50 text-right">
-            <div style={{ transform: `translateY(${-pitch * 0.5}px)` }} className="transition-transform duration-100 flex flex-col gap-8 items-end">
-              <span className="flex items-center gap-1">+30 <span className="w-1.5 h-px bg-accent/40" /></span>
-              <span className="flex items-center gap-1">+15 <span className="w-1.5 h-px bg-accent/40" /></span>
-              <span className="flex items-center gap-1">00 <span className="w-3 h-px bg-accent/60" /></span>
-              <span className="flex items-center gap-1">-15 <span className="w-1.5 h-px bg-accent/40" /></span>
-              <span className="flex items-center gap-1">-30 <span className="w-1.5 h-px bg-accent/40" /></span>
-            </div>
-          </div>
-        </div>
-
-        {/* Actual Image Stream */}
-        {streamUrl ? (
+      <div ref={containerRef} className="relative flex-1 min-h-0 bg-black grid place-items-center group">
+        {streamUrl && !streamError ? (
           <img
             src={streamUrl}
             alt={title}
             className="w-full h-full"
             style={{ objectFit: "contain" }}
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = "none";
-            }}
+            onError={() => setStreamError(true)}
           />
         ) : (
-          <div className="text-muted-foreground/30 text-xs tracking-widest font-mono uppercase z-10 flex flex-col items-center gap-2">
-            <span className="w-6 h-6 border-2 border-dashed border-muted-foreground/30 border-t-transparent rounded-full animate-spin" />
-            WAITING FOR SIGNAL
-          </div>
+          <div className="text-muted-foreground/40 text-xs tracking-widest">NO CAMERA FEED</div>
         )}
 
-        {/* HUD pitch indicator text */}
-        <div className="absolute bottom-4 left-4 font-mono text-[9px] text-accent/80 bg-black/60 px-2 py-0.5 border border-accent/20 rounded z-10 flex flex-col gap-0.5">
-          <span>PITCH: {pitch.toFixed(1)}°</span>
-          <span>ROLL: {roll.toFixed(1)}°</span>
+        {/* Attitude readout — real telemetry, not decorative */}
+        <div className="absolute bottom-2.5 left-2.5 font-mono text-[10px] text-muted-foreground bg-black/60 px-2 py-1 rounded flex items-center gap-2">
+          <span>PITCH {pitch.toFixed(1)}°</span>
+          <span>ROLL {roll.toFixed(1)}°</span>
         </div>
 
         {isRecording && (
-          <div className="absolute top-4 left-4 font-mono text-[9px] text-red-500 bg-black/75 border border-red-500/30 px-2 py-0.5 rounded flex items-center gap-1.5 z-10 shadow-lg">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-            REC ACTIVE
+          <div className="absolute top-2.5 left-2.5 font-mono text-[11px] text-red-500 bg-black/60 px-2 py-1 rounded flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            REC
           </div>
         )}
 
         {statusMessage && (
-          <div className="absolute top-4 right-4 font-mono text-[9px] text-accent bg-black/85 border border-accent/30 px-2 py-0.5 rounded z-20 shadow-lg animate-bounce">
+          <div className="absolute top-2.5 right-2.5 font-mono text-[10px] text-accent bg-black/80 px-2.5 py-1 rounded z-20">
             {statusMessage}
           </div>
         )}
 
-        {/* Control Buttons Overlay */}
-        <div className="absolute bottom-4 right-4 flex gap-1.5 z-20 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300">
+        <div className="absolute bottom-2.5 right-2.5 flex gap-1.5 z-30">
           <button
             onClick={handleToggleFullscreen}
             title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            className="w-8 h-8 grid place-items-center rounded bg-black/70 border border-panel-border/80 hover:border-accent hover:bg-accent hover:text-black hover:cursor-pointer text-white/80 transition-all shadow-md active:scale-95"
+            className="w-8 h-8 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors cursor-pointer"
           >
-            {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
           <button
             onClick={handleScreenshot}
             title="Take Screenshot"
-            className="w-8 h-8 grid place-items-center rounded bg-black/70 border border-panel-border/80 hover:border-accent hover:bg-accent hover:text-black hover:cursor-pointer text-white/80 transition-all shadow-md active:scale-95"
+            className="w-8 h-8 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors cursor-pointer"
           >
-            <ImageIcon size={12} />
+            <ImageIcon size={14} />
           </button>
           <button
             onClick={handleToggleRecord}
             title={isRecording ? "Stop Recording" : "Start Recording"}
-            className={`w-8 h-8 grid place-items-center rounded bg-black/70 border hover:border-accent hover:bg-accent hover:text-black hover:cursor-pointer text-white/80 transition-all shadow-md active:scale-95 ${
-              isRecording ? "border-red-500/50 text-red-500 bg-red-500/10 hover:bg-red-500 hover:text-white" : "border-panel-border/80"
-            }`}
+            className={`w-8 h-8 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors cursor-pointer ${isRecording ? "text-red-500" : ""}`}
           >
-            <Video size={12} />
+            <Video size={14} />
           </button>
         </div>
       </div>

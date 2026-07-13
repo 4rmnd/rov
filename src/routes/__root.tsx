@@ -75,10 +75,21 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-        <Sidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-          <Outlet />
+      <div className="h-screen w-screen overflow-hidden bg-background">
+        {/* Kepadatan tampilan yang disetujui (setara browser zoom 75%), dipermanenkan
+            via transform:scale (bukan properti `zoom` non-standar yang sempat bikin
+            status bar meluber) — width/height 133.33% mengompensasi scale 0.75 supaya
+            tetap mengisi penuh layar. */}
+        <div
+          className="origin-top-left"
+          style={{ transform: "scale(0.75)", width: "133.3333%", height: "133.3333%" }}
+        >
+          <div className="flex h-full w-full overflow-hidden bg-background text-foreground">
+            <Sidebar />
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+              <Outlet />
+            </div>
+          </div>
         </div>
       </div>
     </QueryClientProvider>
