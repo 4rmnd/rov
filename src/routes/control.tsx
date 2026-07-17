@@ -32,6 +32,240 @@ function PilotControlsPage() {
 
   const socket = useROVSocket();
 
+  // Gamepad & Keyboard Pilot Control States
+  const [gamepadConnected, setGamepadConnected] = useState(false);
+  const [gamepadName, setGamepadName] = useState("");
+  const [joystickActive, setJoystickActive] = useState(true);
+  const [keyboardActive, setKeyboardActive] = useState(false);
+  const [channelValues, setChannelValues] = useState<Record<number, number>>({
+    1: 1500,
+    2: 1500,
+    3: 1500,
+    4: 1500,
+  });
+
+  // Polling Refs to prevent stale React closures inside loops
+  const joystickActiveRef = useRef(joystickActive);
+  const keyboardActiveRef = useRef(keyboardActive);
+  const socketRefForLoop = useRef(socket);
+
+  useEffect(() => { joystickActiveRef.current = joystickActive; }, [joystickActive]);
+  useEffect(() => { keyboardActiveRef.current = keyboardActive; }, [keyboardActive]);
+  useEffect(() => { socketRefForLoop.current = socket; }, [socket]);
+
+  const gamepadIndexRef = useRef<number | null>(null);
+  const requestRef = useRef<number | null>(null);
+  const lastEmitRef = useRef<number>(0);
+  const prevChannelsRef = useRef<Record<number, number>>({ 1: 1500, 2: 1500, 3: 1500, 4: 1500 });
+  const keysPressed = useRef<Record<string, boolean>>({});
+
+  const resetToNeutral = () => {
+    const neutral = { 1: 1500, 2: 1500, 3: 1500, 4: 1500 };
+    setChannelValues(neutral);
+    if (socketRefForLoop.current.connected) {
+      socketRefForLoop.current.sendRCOverride(neutral);
+    }
+    prevChannelsRef.current = neutral;
+  };
+
+  const pollGamepad = () => {
+    if (gamepadIndexRef.current === null) return;
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp = gamepads[gamepadIndexRef.current];
+
+    if (!gp) {
+      setGamepadConnected(false);
+      setGamepadName("");
+      gamepadIndexRef.current = null;
+      return;
+    }
+
+    const deadzone = 0.08;
+    const applyDeadzone = (val: number) => {
+      if (Math.abs(val) < deadzone) return 0;
+      return (val - Math.sign(val) * deadzone) / (1 - deadzone);
+    };
+
+    // Standard Mapping: Left Stick (Lateral, Forward), Right Stick (Yaw, Throttle)
+    const rawLat = gp.axes[0] ?? 0;
+    const rawFwd = gp.axes[1] ?? 0;
+    const rawYaw = gp.axes[2] ?? 0;
+    const rawThr = gp.axes[3] ?? 0;
+
+    const lat = applyDeadzone(rawLat);
+    const fwd = -applyDeadzone(rawFwd); // Invert Y-axis
+    const thr = -applyDeadzone(rawThr); // Invert Y-axis
+    const yaw = applyDeadzone(rawYaw);
+
+    const pwmLat = Math.round(1500 + lat * 400);
+    const pwmFwd = Math.round(1500 + fwd * 400);
+    const pwmThr = Math.round(1500 + thr * 400);
+    const pwmYaw = Math.round(1500 + yaw * 400);
+
+    const nextChannels = {
+      1: pwmLat,
+      2: pwmFwd,
+      3: pwmThr,
+      4: pwmYaw,
+    };
+
+    setChannelValues(nextChannels);
+
+    if (socketRefForLoop.current.connected && joystickActiveRef.current) {
+      const now = Date.now();
+      if (now - lastEmitRef.current >= 50) {
+        const changed =
+          nextChannels[1] !== prevChannelsRef.current[1] ||
+          nextChannels[2] !== prevChannelsRef.current[2] ||
+          nextChannels[3] !== prevChannelsRef.current[3] ||
+          nextChannels[4] !== prevChannelsRef.current[4];
+
+        if (changed || now - lastEmitRef.current >= 200) {
+          socketRefForLoop.current.sendRCOverride(nextChannels);
+          prevChannelsRef.current = nextChannels;
+          lastEmitRef.current = now;
+        }
+      }
+    }
+
+    requestRef.current = requestAnimationFrame(pollGamepad);
+  };
+
+  // Gamepad Connection effect
+  useEffect(() => {
+    const handleConnect = (e: GamepadEvent) => {
+      console.log("Gamepad connected:", e.gamepad.id);
+      setGamepadConnected(true);
+      setGamepadName(e.gamepad.id);
+      gamepadIndexRef.current = e.gamepad.index;
+      requestRef.current = requestAnimationFrame(pollGamepad);
+    };
+
+    const handleDisconnect = (e: GamepadEvent) => {
+      if (gamepadIndexRef.current === e.gamepad.index) {
+        console.log("Gamepad disconnected:", e.gamepad.id);
+        setGamepadConnected(false);
+        setGamepadName("");
+        gamepadIndexRef.current = null;
+        if (requestRef.current) {
+          cancelAnimationFrame(requestRef.current);
+        }
+        resetToNeutral();
+      }
+    };
+
+    window.addEventListener("gamepadconnected", handleConnect);
+    window.addEventListener("gamepaddisconnected", handleDisconnect);
+
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (let i = 0; i < gamepads.length; i++) {
+      if (gamepads[i]) {
+        setGamepadConnected(true);
+        setGamepadName(gamepads[i]!.id);
+        gamepadIndexRef.current = i;
+        requestRef.current = requestAnimationFrame(pollGamepad);
+        break;
+      }
+    }
+
+    return () => {
+      window.removeEventListener("gamepadconnected", handleConnect);
+      window.removeEventListener("gamepaddisconnected", handleDisconnect);
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+      }
+      const neutral = { 1: 1500, 2: 1500, 3: 1500, 4: 1500 };
+      if (socketRefForLoop.current.connected) {
+        socketRefForLoop.current.sendRCOverride(neutral);
+      }
+    };
+  }, [socket.connected]);
+
+  // Keyboard Backup control effect
+  useEffect(() => {
+    if (!keyboardActive || gamepadConnected) {
+      if (!gamepadConnected) {
+        resetToNeutral();
+      }
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+        if (["arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+          e.preventDefault();
+        }
+        keysPressed.current[key] = true;
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key in keysPressed.current) {
+        keysPressed.current[key] = false;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    const keyboardInterval = setInterval(() => {
+      let lat = 0;
+      let fwd = 0;
+      let thr = 0;
+      let yaw = 0;
+
+      if (keysPressed.current["w"]) fwd += 1;
+      if (keysPressed.current["s"]) fwd -= 1;
+      if (keysPressed.current["a"]) lat -= 1;
+      if (keysPressed.current["d"]) lat += 1;
+
+      if (keysPressed.current["arrowup"]) thr += 1;
+      if (keysPressed.current["arrowdown"]) thr -= 1;
+      if (keysPressed.current["arrowleft"]) yaw -= 1;
+      if (keysPressed.current["arrowright"]) yaw += 1;
+
+      const pwmLat = Math.round(1500 + lat * 300);
+      const pwmFwd = Math.round(1500 + fwd * 300);
+      const pwmThr = Math.round(1500 + thr * 300);
+      const pwmYaw = Math.round(1500 + yaw * 300);
+
+      const nextChannels = {
+        1: pwmLat,
+        2: pwmFwd,
+        3: pwmThr,
+        4: pwmYaw,
+      };
+
+      setChannelValues(nextChannels);
+
+      if (socketRefForLoop.current.connected) {
+        const now = Date.now();
+        if (now - lastEmitRef.current >= 50) {
+          const changed =
+            nextChannels[1] !== prevChannelsRef.current[1] ||
+            nextChannels[2] !== prevChannelsRef.current[2] ||
+            nextChannels[3] !== prevChannelsRef.current[3] ||
+            nextChannels[4] !== prevChannelsRef.current[4];
+
+          if (changed || now - lastEmitRef.current >= 200) {
+            socketRefForLoop.current.sendRCOverride(nextChannels);
+            prevChannelsRef.current = nextChannels;
+            lastEmitRef.current = now;
+          }
+        }
+      }
+    }, 50);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      clearInterval(keyboardInterval);
+      resetToNeutral();
+    };
+  }, [keyboardActive, gamepadConnected, socket.connected]);
+
   const roll = socket.trajectory?.orientation?.roll ?? 0;
   const pitch = socket.trajectory?.orientation?.pitch ?? 0;
   const yaw = socket.trajectory?.orientation?.yaw ?? 0;
@@ -202,11 +436,11 @@ function PilotControlsPage() {
             <span className="label-caps">Pilot Switchboard</span>
           </div>
 
-          <div className="flex-1 flex flex-col justify-center gap-2.5 py-3">
+          <div className="flex-1 flex flex-col justify-start gap-2.5 py-3 overflow-y-auto scrollbar-thin">
             {/* Power Arm button */}
             <button
               onClick={handleToggleArm}
-              className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors ${
+              className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors shrink-0 ${
                 socket.telemetry?.armed
                   ? "bg-red-500/20 text-red-500 border-red-500/30"
                   : "bg-panel border-panel-border text-muted-foreground hover:text-foreground hover:bg-panel/60"
@@ -219,7 +453,7 @@ function PilotControlsPage() {
             {/* Flight Mode toggle */}
             <button
               onClick={handleToggleMode}
-              className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors ${
+              className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors shrink-0 ${
                 socket.telemetry?.mode === "DEPTH_HOLD"
                   ? "bg-accent/20 text-accent border-accent/30"
                   : "bg-panel border-panel-border text-muted-foreground hover:text-foreground hover:bg-panel/60"
@@ -232,7 +466,7 @@ function PilotControlsPage() {
             {/* Auxiliary toggle: light */}
             <button
               onClick={handleToggleLight}
-              className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors ${
+              className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors shrink-0 ${
                 lightState
                   ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30"
                   : "bg-panel border-panel-border text-muted-foreground hover:text-foreground hover:bg-panel/60"
@@ -245,7 +479,7 @@ function PilotControlsPage() {
             {/* Auxiliary toggle: gripper */}
             <button
               onClick={handleToggleGripper}
-              className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors ${
+              className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors shrink-0 ${
                 gripperState
                   ? "bg-green-500/20 text-green-500 border-green-500/30"
                   : "bg-panel border-panel-border text-muted-foreground hover:text-foreground hover:bg-panel/60"
@@ -254,6 +488,97 @@ function PilotControlsPage() {
               <RotateCcw size={16} />
               <span>{gripperState ? "VESSEL GRIPPER: OPEN" : "VESSEL GRIPPER: CLOSE"}</span>
             </button>
+
+            {/* Joystick Control Panel */}
+            <div className="bg-[oklch(0.12_0.024_250)] rounded-lg p-3 border border-panel-border/60 mt-1 space-y-2.5 shrink-0">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">
+                  Joystick Pilot Control
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setKeyboardActive(!keyboardActive)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
+                      keyboardActive
+                        ? "bg-accent/20 text-accent border-accent/40"
+                        : "bg-panel border-panel-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Keyboard
+                  </button>
+                  <button
+                    onClick={() => setJoystickActive(!joystickActive)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
+                      joystickActive
+                        ? "bg-green-500/20 text-green-400 border-green-500/40"
+                        : "bg-panel border-panel-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {joystickActive ? "Output ON" : "Output OFF"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Indicator */}
+              <div className="flex items-center justify-between text-[11px] bg-[oklch(0.15_0.028_250)] rounded px-2 py-1 border border-panel-border/30">
+                <span className="text-muted-foreground font-medium">Device Status:</span>
+                {gamepadConnected ? (
+                  <span className="text-[color:var(--color-success)] font-mono font-bold flex items-center gap-1 animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-success)]" />
+                    CONNECTED
+                  </span>
+                ) : keyboardActive ? (
+                  <span className="text-accent font-mono font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                    KEYBOARD MODE
+                  </span>
+                ) : (
+                  <span className="text-red-400 font-mono font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    DISCONNECTED
+                  </span>
+                )}
+              </div>
+
+              {gamepadConnected && (
+                <div className="text-[9px] text-muted-foreground font-mono truncate bg-black/20 p-1 rounded text-center">
+                  {gamepadName}
+                </div>
+              )}
+
+              {/* Channels Visualizers */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "CH1 Lateral", val: channelValues[1], key: 1 },
+                  { label: "CH2 Forward", val: channelValues[2], key: 2 },
+                  { label: "CH3 Throttle", val: channelValues[3], key: 3 },
+                  { label: "CH4 Yaw", val: channelValues[4], key: 4 },
+                ].map((ch) => {
+                  const percentage = ((ch.val - 1100) / 800) * 100;
+                  return (
+                    <div key={ch.key} className="space-y-0.5 bg-black/10 p-1.5 rounded border border-panel-border/20">
+                      <div className="flex justify-between text-[8px] font-mono">
+                        <span className="text-muted-foreground truncate max-w-[55px]">{ch.label}</span>
+                        <span className="text-[color:var(--color-data)] font-bold">{ch.val}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-panel-border/30 rounded-full overflow-hidden relative border border-panel-border/40">
+                        <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/30 z-10" />
+                        <div
+                          className="h-full bg-gradient-to-r from-accent to-[color:var(--color-success)] transition-all duration-75"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {!socket.telemetry?.armed && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded p-1.5 text-center text-[9px] font-semibold leading-normal">
+                  ⚠️ VESSEL DISARMED. Arm motors to enable thruster outputs.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="border-t border-panel-border/40 pt-2.5 shrink-0">

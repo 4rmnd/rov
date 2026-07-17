@@ -256,6 +256,12 @@ export function useROVSocket() {
     }
   };
 
+  const sendRCOverride = (channels: Record<number, number>) => {
+    if (socketRef.current) {
+      socketRef.current.emit("cmd_rc_override", { channels });
+    }
+  };
+
   return {
     ...state,
     sendEmergencyStop,
@@ -267,5 +273,6 @@ export function useROVSocket() {
     sendLight,
     sendAutonomousStart,
     sendAutonomousStop,
+    sendRCOverride,
   };
 }
