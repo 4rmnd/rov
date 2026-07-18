@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Power, ToggleLeft, Play, RotateCcw,
@@ -28,7 +28,7 @@ function useClock() {
 }
 
 // ─── PWM helpers ───────────────────────────────────────────────────────────────
-const DEADZONE  = 0.10;
+const DEADZONE = 0.10;
 const PWM_RANGE = 400;
 function applyDZ(v: number) {
   if (Math.abs(v) < DEADZONE) return 0;
@@ -38,19 +38,42 @@ function axisPWM(v: number, invert = false) {
   return Math.round(1500 + applyDZ(invert ? -v : v) * PWM_RANGE);
 }
 
+// ─── DirectInput 8-Direction POV Hat Parser (Axis #9) ──────────────────────────
+function parsePOVHat(pov: number) {
+  // Neutral / Idle values (0.0, 1.0, or outside [-1.05, 1.05])
+  if (pov === 0 || pov > 1.05 || (pov > 0.82 && pov < 0.98)) {
+    return { up: false, down: false, left: false, right: false };
+  }
+  const isUp = (pov <= -0.85) || (pov >= 0.85 && pov <= 1.05);
+  const isDown = (pov >= 0.02 && pov <= 0.28);
+  const isRight = (pov >= -0.58 && pov <= -0.28);
+  const isLeft = (pov >= 0.58 && pov <= 0.82);
+
+  const isUpRight = (pov >= -0.84 && pov <= -0.59);
+  const isDownRight = (pov >= -0.27 && pov <= -0.01);
+  const isDownLeft = (pov >= 0.29 && pov <= 0.57);
+
+  return {
+    up: isUp || isUpRight,
+    down: isDown || isDownRight || isDownLeft,
+    left: isLeft || isDownLeft,
+    right: isRight || isUpRight || isDownRight,
+  };
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type CH = { 1: number; 2: number; 3: number; 4: number };
 const NEUTRAL: CH = { 1: 1500, 2: 1500, 3: 1500, 4: 1500 };
 
 // ── Axis Mapping ──────────────────────────────────────────────────────────────
-export type AxisMap   = { axisIdx: number; invert: boolean };
+export type AxisMap = { axisIdx: number; invert: boolean };
 export type GPMapping = { lateral: AxisMap; forward: AxisMap; throttle: AxisMap; yaw: AxisMap };
 
 const DEFAULT_AXIS_MAPPING: GPMapping = {
-  lateral:  { axisIdx: 0, invert: false }, // Left Stick X  (x360ce Axis 1)
-  forward:  { axisIdx: 1, invert: true  }, // Left Stick Y  (x360ce IAxis 2)
-  throttle: { axisIdx: 2, invert: true  }, // Right Stick Y (x360ce IAxis 3)
-  yaw:      { axisIdx: 5, invert: false }, // Right Stick X (x360ce Axis 6 -> 0-index Axis 5)
+  lateral: { axisIdx: 0, invert: false }, // Left Stick X  (x360ce Axis 1)
+  forward: { axisIdx: 1, invert: true }, // Left Stick Y  (x360ce IAxis 2)
+  throttle: { axisIdx: 2, invert: true }, // Right Stick Y (x360ce IAxis 3)
+  yaw: { axisIdx: 5, invert: false }, // Right Stick X (x360ce Axis 6 -> 0-index Axis 5)
 };
 
 // ── Button Mapping ────────────────────────────────────────────────────────────
@@ -62,18 +85,18 @@ export type ROVAction =
 export type ButtonMapping = Record<number, ROVAction>;
 
 const ACTION_META: Record<ROVAction, { label: string; color: string }> = {
-  none:            { label: "— None (no action) —",       color: "text-muted-foreground" },
-  arm_toggle:      { label: "ARM / DISARM toggle",         color: "text-red-400" },
-  arm:             { label: "ARM motors",                  color: "text-red-400" },
-  disarm:          { label: "DISARM motors",               color: "text-orange-400" },
-  light_toggle:    { label: "LED Light toggle",            color: "text-yellow-400" },
-  gripper_toggle:  { label: "Gripper open/close toggle",  color: "text-green-400" },
-  gripper_open:    { label: "Open gripper",                color: "text-green-400" },
-  gripper_close:   { label: "Close gripper",               color: "text-green-300" },
-  mode_toggle:     { label: "Mode: Manual ↔ Depth Hold",  color: "text-cyan-400" },
-  mode_manual:     { label: "Set MANUAL mode",             color: "text-cyan-400" },
-  mode_depth_hold: { label: "Set DEPTH HOLD mode",         color: "text-accent" },
-  emergency_stop:  { label: "EMERGENCY STOP",              color: "text-red-500" },
+  none: { label: "— None (no action) —", color: "text-muted-foreground" },
+  arm_toggle: { label: "ARM / DISARM toggle", color: "text-red-400" },
+  arm: { label: "ARM motors", color: "text-red-400" },
+  disarm: { label: "DISARM motors", color: "text-orange-400" },
+  light_toggle: { label: "LED Light toggle", color: "text-yellow-400" },
+  gripper_toggle: { label: "Gripper open/close toggle", color: "text-green-400" },
+  gripper_open: { label: "Open gripper", color: "text-green-400" },
+  gripper_close: { label: "Close gripper", color: "text-green-300" },
+  mode_toggle: { label: "Mode: Manual ↔ Depth Hold", color: "text-cyan-400" },
+  mode_manual: { label: "Set MANUAL mode", color: "text-cyan-400" },
+  mode_depth_hold: { label: "Set DEPTH HOLD mode", color: "text-accent" },
+  emergency_stop: { label: "EMERGENCY STOP", color: "text-red-500" },
 };
 
 // PS2 stick via USB adapter — corrected HID button layout
@@ -82,90 +105,138 @@ const ACTION_META: Record<ROVAction, { label: string; color: string }> = {
 // Select=8, Start=9, L3=10, R3=11
 // D-pad: beberapa adapter map ke btn 12-15, sebagian lain via axes — lihat tab Axis untuk cek
 const PS2_BUTTONS: Record<number, { label: string; sym: string; color: string }> = {
-  0:  { label: "Triangle △",        sym: "△",  color: "text-emerald-400" },
-  1:  { label: "Circle ○",          sym: "○",  color: "text-red-400"     },
-  2:  { label: "Cross ×",           sym: "×",  color: "text-sky-400"     },
-  3:  { label: "Square □",          sym: "□",  color: "text-pink-400"    },
-  4:  { label: "L2",                sym: "L2", color: "text-violet-400"  },
-  5:  { label: "R2",                sym: "R2", color: "text-violet-400"  },
-  6:  { label: "L1",                sym: "L1", color: "text-amber-400"   },
-  7:  { label: "R1",                sym: "R1", color: "text-amber-400"   },
-  8:  { label: "Select",            sym: "SL", color: "text-slate-400"   },
-  9:  { label: "Start",             sym: "ST", color: "text-slate-400"   },
-  10: { label: "L3 (L-stick click)",sym: "L3", color: "text-cyan-400"    },
-  11: { label: "R3 (R-stick click)",sym: "R3", color: "text-cyan-400"    },
-  12: { label: "D-pad ↑",           sym: "↑",  color: "text-slate-400"   },
-  13: { label: "D-pad ↓",           sym: "↓",  color: "text-slate-400"   },
-  14: { label: "D-pad ←",           sym: "←",  color: "text-slate-400"   },
-  15: { label: "D-pad →",           sym: "→",  color: "text-slate-400"   },
-  16: { label: "Btn 16",            sym: "16", color: "text-slate-500"   },
-  17: { label: "Btn 17",            sym: "17", color: "text-slate-500"   },
-  18: { label: "Btn 18",            sym: "18", color: "text-slate-500"   },
-  19: { label: "Btn 19",            sym: "19", color: "text-slate-500"   },
+  0: { label: "Triangle △", sym: "△", color: "text-emerald-400" },
+  1: { label: "Circle ○", sym: "○", color: "text-red-400" },
+  2: { label: "Cross ×", sym: "×", color: "text-sky-400" },
+  3: { label: "Square □", sym: "□", color: "text-pink-400" },
+  4: { label: "L2 Trigger", sym: "L2", color: "text-violet-400" },
+  5: { label: "R2 Trigger", sym: "R2", color: "text-violet-400" },
+  6: { label: "L1 Bumper", sym: "L1", color: "text-amber-400" },
+  7: { label: "R1 Bumper", sym: "R1", color: "text-amber-400" },
+  8: { label: "Select", sym: "SL", color: "text-slate-400" },
+  9: { label: "Start", sym: "ST", color: "text-slate-400" },
+  10: { label: "L3 (Tombol Pentulan Stick Kiri)", sym: "L3 🕹️", color: "text-cyan-300 font-bold" },
+  11: { label: "R3 (Tombol Pentulan Stick Kanan)", sym: "R3 🕹️", color: "text-cyan-300 font-bold" },
+  12: { label: "D-pad ↑ (Up)", sym: "↑", color: "text-amber-400" },
+  13: { label: "D-pad ↓ (Down)", sym: "↓", color: "text-amber-400" },
+  14: { label: "D-pad ← (Left)", sym: "←", color: "text-amber-400" },
+  15: { label: "D-pad → (Right)", sym: "→", color: "text-amber-400" },
+  16: { label: "Btn 16 / Extra", sym: "16", color: "text-slate-500" },
+  17: { label: "Btn 17 / Extra", sym: "17", color: "text-slate-500" },
+  18: { label: "Btn 18 / Extra", sym: "18", color: "text-slate-500" },
+  19: { label: "Btn 19 / Extra", sym: "19", color: "text-slate-500" },
+  20: { label: "Pentulan Kiri ↑ (Left Stick Up)", sym: "L-Stick ↑", color: "text-cyan-300 font-bold" },
+  21: { label: "Pentulan Kiri ↓ (Left Stick Down)", sym: "L-Stick ↓", color: "text-cyan-300 font-bold" },
+  22: { label: "Pentulan Kiri ← (Left Stick Left)", sym: "L-Stick ←", color: "text-cyan-300 font-bold" },
+  23: { label: "Pentulan Kiri → (Left Stick Right)", sym: "L-Stick →", color: "text-cyan-300 font-bold" },
+  24: { label: "Pentulan Kanan ↑ (Right Stick Up)", sym: "R-Stick ↑", color: "text-violet-300 font-bold" },
+  25: { label: "Pentulan Kanan ↓ (Right Stick Down)", sym: "R-Stick ↓", color: "text-violet-300 font-bold" },
+  26: { label: "Pentulan Kanan ← (Right Stick Left)", sym: "R-Stick ←", color: "text-violet-300 font-bold" },
+  27: { label: "Pentulan Kanan → (Right Stick Right)", sym: "R-Stick →", color: "text-violet-300 font-bold" },
 };
 
 // Default mapping pakai index yang sudah dikoreksi:
 // Triangle=0, Circle=1, Cross=2, Square=3, Start=9
 const DEFAULT_BUTTON_MAPPING: ButtonMapping = {
-  0:  "mode_toggle",    // Triangle △
-  1:  "gripper_toggle", // Circle ○
-  2:  "arm_toggle",     // Cross ×
-  3:  "light_toggle",   // Square □
-  9:  "emergency_stop", // Start
+  0: "mode_toggle",    // Triangle △
+  1: "gripper_toggle", // Circle ○
+  2: "arm_toggle",     // Cross ×
+  3: "light_toggle",   // Square □
+  9: "emergency_stop", // Start
 };
 
 // ── LocalStorage ──────────────────────────────────────────────────────────────
 const LS_AXIS = "rov_axis_mapping_v1";
-const LS_BTN  = "rov_btn_mapping_v1";
+const LS_BTN = "rov_btn_mapping_v1";
 function loadLS<T>(key: string, fallback: T): T {
   try { const r = localStorage.getItem(key); return r ? { ...fallback, ...JSON.parse(r) } : fallback; } catch { return fallback; }
 }
 function saveLS(key: string, val: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch { }
 }
 
 // ── Axis function meta ────────────────────────────────────────────────────────
 const AXIS_FN_META: Record<keyof GPMapping, { label: string; ch: number; color: string; desc: string }> = {
-  lateral:  { label: "Lateral",  ch: 1, color: "text-cyan-400",    desc: "Strafe left / right" },
-  forward:  { label: "Forward",  ch: 2, color: "text-emerald-400", desc: "Move forward / backward" },
-  throttle: { label: "Throttle", ch: 3, color: "text-amber-400",   desc: "Ascend / descend" },
-  yaw:      { label: "Yaw",      ch: 4, color: "text-violet-400",  desc: "Rotate left / right" },
+  lateral: { label: "Lateral", ch: 1, color: "text-cyan-400", desc: "Strafe left / right" },
+  forward: { label: "Forward", ch: 2, color: "text-emerald-400", desc: "Move forward / backward" },
+  throttle: { label: "Throttle", ch: 3, color: "text-amber-400", desc: "Ascend / descend" },
+  yaw: { label: "Yaw", ch: 4, color: "text-violet-400", desc: "Rotate left / right" },
 };
 
 // ─── Mapping Modal ─────────────────────────────────────────────────────────────
 interface MappingModalProps {
-  gpIdx:         number | null;
-  axisMapping:   GPMapping;
-  btnMapping:    ButtonMapping;
-  onSave:        (axis: GPMapping, btn: ButtonMapping) => void;
-  onClose:       () => void;
+  gpIdx: number | null;
+  axisMapping: GPMapping;
+  btnMapping: ButtonMapping;
+  onSave: (axis: GPMapping, btn: ButtonMapping) => void;
+  onClose: () => void;
 }
 
 function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: MappingModalProps) {
-  const [tab,          setTab]         = useState<"axis" | "button">("button");
-  const [draftAxis,    setDraftAxis]   = useState<GPMapping>({ ...axisMapping });
-  const [draftBtn,     setDraftBtn]    = useState<ButtonMapping>({ ...btnMapping });
-  const [detectAxis,   setDetectAxis]  = useState<keyof GPMapping | null>(null);
-  const [detectBtn,    setDetectBtn]   = useState<number | null>(null); // which btn slot is waiting
-  const [liveAxes,     setLiveAxes]    = useState<number[]>([]);
-  const [liveBtns,     setLiveBtns]    = useState<boolean[]>([]);
-  const [prevBtns,     setPrevBtns]    = useState<boolean[]>([]);
+  const [tab, setTab] = useState<"axis" | "button">("button");
+  const [draftAxis, setDraftAxis] = useState<GPMapping>({ ...axisMapping });
+  const [draftBtn, setDraftBtn] = useState<ButtonMapping>({ ...btnMapping });
+  const [detectAxis, setDetectAxis] = useState<keyof GPMapping | null>(null);
+  const [detectBtn, setDetectBtn] = useState<number | null>(null);
+  const [liveAxes, setLiveAxes] = useState<number[]>([]);
+  const [liveBtns, setLiveBtns] = useState<boolean[]>([]);
+  const [prevBtns, setPrevBtns] = useState<boolean[]>([]);
+  const [activeGpName, setActiveGpName] = useState<string | null>(null);
 
   const detectAxisRef = useRef<keyof GPMapping | null>(null);
-  const detectBtnRef  = useRef<number | null>(null);
-  const draftAxisRef  = useRef(draftAxis);
+  const detectBtnRef = useRef<number | null>(null);
+  const draftAxisRef = useRef(draftAxis);
   useEffect(() => { draftAxisRef.current = draftAxis; }, [draftAxis]);
   useEffect(() => { detectAxisRef.current = detectAxis; }, [detectAxis]);
-  useEffect(() => { detectBtnRef.current  = detectBtn;  }, [detectBtn]);
+  useEffect(() => { detectBtnRef.current = detectBtn; }, [detectBtn]);
 
-  // Live poll
+  // Live poll: dynamically scan all connected gamepads in browser
   useEffect(() => {
     const id = setInterval(() => {
-      const gp = gpIdx !== null ? (navigator.getGamepads?.()[gpIdx] ?? null) : null;
-      if (!gp) { setLiveAxes([]); setLiveBtns([]); return; }
+      const pads = navigator.getGamepads?.() ?? [];
+      let gp: Gamepad | null = null;
+      if (gpIdx !== null && pads[gpIdx]) {
+        gp = pads[gpIdx];
+      } else {
+        for (let i = 0; i < pads.length; i++) {
+          if (pads[i]) { gp = pads[i]; break; }
+        }
+      }
 
-      const axes   = Array.from(gp.axes);
-      const btns   = Array.from(gp.buttons).map(b => b.pressed);
+      if (!gp) {
+        setLiveAxes([]);
+        setLiveBtns([]);
+        setActiveGpName(null);
+        return;
+      }
+
+      setActiveGpName(gp.id);
+      const axes = Array.from(gp.axes);
+      const btns = Array.from(gp.buttons).map(b => b.pressed || (typeof b === "object" && b.value > 0.5));
+
+      // Virtual D-pad buttons 12, 13, 14, 15 from Axis #9 (POV Hat)
+      const povParsed = parsePOVHat(axes[9] ?? axes[4] ?? 0);
+      if (povParsed.up) btns[12] = true; // Up -> D-pad ↑
+      if (povParsed.down) btns[13] = true; // Down -> D-pad ↓
+      if (povParsed.left) btns[14] = true; // Left -> D-pad ←
+      if (povParsed.right) btns[15] = true; // Right -> D-pad →
+
+      // Virtual Stick Deflections for Left Stick & Right Stick (20..27)
+      const a0 = axes[0] ?? 0;
+      const a1 = axes[1] ?? 0;
+      const a2 = axes[2] ?? 0;
+      const a5 = axes[5] ?? 0;
+
+      if (a1 < -0.45) btns[20] = true; // Left Stick Up
+      if (a1 > 0.45)  btns[21] = true; // Left Stick Down
+      if (a0 < -0.45) btns[22] = true; // Left Stick Left
+      if (a0 > 0.45)  btns[23] = true; // Left Stick Right
+
+      if (a2 < -0.45) btns[24] = true; // Right Stick Up
+      if (a2 > 0.45)  btns[25] = true; // Right Stick Down
+      if (a5 < -0.45) btns[26] = true; // Right Stick Left
+      if (a5 > 0.45)  btns[27] = true; // Right Stick Right
+
       setLiveAxes(axes);
       setLiveBtns(btns);
 
@@ -186,12 +257,8 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
         setPrevBtns(prev => {
           btns.forEach((pressed, i) => {
             if (pressed && !prev[i]) {
-              // Rising edge — assign this button index to dSlot
-              setDraftBtn(cur => ({ ...cur, [dSlot]: cur[dSlot] ?? "none" }));
-              // Actually we want to assign dSlot action to button i
               setDraftBtn(cur => {
                 const action = cur[dSlot] ?? "none";
-                // Remove dSlot key, add btn index i with same action
                 const next = { ...cur };
                 delete next[dSlot];
                 next[i] = action;
@@ -209,18 +276,16 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
     return () => clearInterval(id);
   }, [gpIdx]);
 
-  const gpAvail = gpIdx !== null;
+  const gpAvail = activeGpName !== null || liveBtns.length > 0;
 
   const handleSave = () => { saveLS(LS_AXIS, draftAxis); saveLS(LS_BTN, draftBtn); onSave(draftAxis, draftBtn); onClose(); };
 
-  // ── Button mapping helpers ─────────────────────────────────────────────────
   const setButtonAction = (btnIdx: number, action: ROVAction) => {
     setDraftBtn(prev => ({ ...prev, [btnIdx]: action }));
   };
   const removeButton = (btnIdx: number) => {
     setDraftBtn(prev => { const n = { ...prev }; delete n[btnIdx]; return n; });
   };
-  // All button slots: assigned + live detected + all known PS2 buttons (up to 20)
   const allBtnIndices = Array.from(new Set([
     ...Object.keys(draftBtn).map(Number),
     ...liveBtns.map((_, i) => i),
@@ -255,15 +320,29 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
               {t === "button" ? "🎮 Button Mapping" : "🕹️ Axis Mapping"}
             </button>
           ))}
-          {!gpAvail && (
-            <div className="ml-auto flex items-center text-amber-400 text-[9px] font-semibold bg-amber-500/10 border border-amber-500/30 rounded-lg px-2">
-              ⚠ No gamepad — connect & press any button
-            </div>
-          )}
         </div>
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+          {/* Gamepad Status Banner */}
+          {gpAvail ? (
+            <div className="bg-emerald-500/15 border border-emerald-500/40 rounded-xl p-3 flex items-center justify-between text-emerald-300 text-xs font-semibold">
+              <div className="flex items-center gap-2 truncate">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                <span className="truncate">✓ CONTROLLER TERHUBUNG: <strong className="font-mono text-emerald-200">{activeGpName}</strong></span>
+              </div>
+              <span className="text-[10px] text-emerald-400 font-mono shrink-0">Tekan tombol / gerak stik</span>
+            </div>
+          ) : (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-center justify-between text-amber-300 text-xs font-semibold">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <span>⚠ JOYSTICK BELUM AKTIF DI BROWSER</span>
+              </div>
+              <span className="text-[10px] font-mono text-amber-400/90 shrink-0">Colok USB &amp; TEKAN SEMBARANG TOMBOL</span>
+            </div>
+          )}
 
           {/* ── BUTTON MAPPING TAB ── */}
           {tab === "button" && (
@@ -272,42 +351,121 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                 Button → ROV Action Assignment
               </div>
               <div className="text-[9px] text-muted-foreground -mt-2">
-                Tekan tombol di joystick untuk lihat yang mana (bersinar saat ditekan), lalu assign aksi.
+                Tekan tombol di joystick untuk lihat yang mana (akan menyala hijau terang saat ditekan), lalu assign aksi.
+              </div>
+
+              {/* Pentulan Joystick Directions Box (Analog Sticks 20-27) */}
+              <div className="bg-violet-500/10 border border-violet-500/30 rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-violet-300 font-bold text-xs">
+                    <span className="text-base">🕹️</span>
+                    <span>MAPPING PENTULAN JOYSTICK (ANALOG STICKS)</span>
+                  </div>
+                  <span className="text-[9px] text-violet-400 font-mono">Gerakkan Pentulan Stick</span>
+                </div>
+                <div className="text-[9px] text-muted-foreground -mt-2">
+                  Gerakkan analog stick kiri/kanan ke arah yang diinginkan (akan menyala hijau live) untuk assign fungsi khusus!
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {/* Left Stick Directions (20-23) */}
+                  <div className="bg-[oklch(0.14_0.02_250)] p-2.5 rounded-lg border border-cyan-500/30 space-y-2">
+                    <div className="text-[10px] font-bold text-cyan-300 flex items-center gap-1">
+                      <span>🕹️ Pentulan Kiri (Left Stick)</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {[20, 21, 22, 23].map(btnIdx => {
+                        const ps2 = PS2_BUTTONS[btnIdx];
+                        const action = draftBtn[btnIdx] ?? "none";
+                        const pressed = liveBtns[btnIdx] ?? false;
+                        return (
+                          <div key={btnIdx} className={`p-2 rounded border transition-all duration-75 flex items-center justify-between gap-2 ${
+                            pressed
+                              ? "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400 shadow-md scale-[1.02]"
+                              : "border-panel-border/40 bg-panel/50"
+                          }`}>
+                            <span className={`text-[10px] font-bold shrink-0 ${pressed ? "text-emerald-300" : ps2?.color}`}>{ps2?.sym}</span>
+                            <select
+                              value={action}
+                              onChange={e => setButtonAction(btnIdx, e.target.value as ROVAction)}
+                              className="bg-panel border border-panel-border rounded px-1.5 py-0.5 text-[10px] font-mono text-foreground focus:outline-none focus:border-cyan-400 min-w-0 cursor-pointer">
+                              {(Object.keys(ACTION_META) as ROVAction[]).map(a => (
+                                <option key={a} value={a}>{ACTION_META[a].label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right Stick Directions (24-27) */}
+                  <div className="bg-[oklch(0.14_0.02_250)] p-2.5 rounded-lg border border-violet-500/30 space-y-2">
+                    <div className="text-[10px] font-bold text-violet-300 flex items-center gap-1">
+                      <span>🕹️ Pentulan Kanan (Right Stick)</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {[24, 25, 26, 27].map(btnIdx => {
+                        const ps2 = PS2_BUTTONS[btnIdx];
+                        const action = draftBtn[btnIdx] ?? "none";
+                        const pressed = liveBtns[btnIdx] ?? false;
+                        return (
+                          <div key={btnIdx} className={`p-2 rounded border transition-all duration-75 flex items-center justify-between gap-2 ${
+                            pressed
+                              ? "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400 shadow-md scale-[1.02]"
+                              : "border-panel-border/40 bg-panel/50"
+                          }`}>
+                            <span className={`text-[10px] font-bold shrink-0 ${pressed ? "text-emerald-300" : ps2?.color}`}>{ps2?.sym}</span>
+                            <select
+                              value={action}
+                              onChange={e => setButtonAction(btnIdx, e.target.value as ROVAction)}
+                              className="bg-panel border border-panel-border rounded px-1.5 py-0.5 text-[10px] font-mono text-foreground focus:outline-none focus:border-violet-400 min-w-0 cursor-pointer">
+                              {(Object.keys(ACTION_META) as ROVAction[]).map(a => (
+                                <option key={a} value={a}>{ACTION_META[a].label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* D-pad info */}
               <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-[9px] text-amber-300/80">
-                <span className="font-bold text-amber-300">⚠ D-pad:</span> Beberapa PS2 USB adapter mengirim D-pad sebagai <strong>axes</strong> (bukan buttons), sehingga tidak muncul di daftar ini.
-                Cek tab <strong>🕹️ Axis Mapping</strong> → <em>All Live Axes</em> untuk melihat apakah D-pad muncul di axes 4/5 atau lebih. Kalau muncul di axes, D-pad hanya bisa kontrol gerakan, bukan action.
+                <span className="font-bold text-amber-300">⚠ D-pad:</span> D-pad terintegrasi otomatis dari Axis #9. Tekan D-pad Atas/Bawah/Kiri/Kanan untuk tes menyala hijau.
               </div>
 
               <div className="grid grid-cols-1 gap-1.5">
                 {allBtnIndices.map(btnIdx => {
-                  const ps2    = PS2_BUTTONS[btnIdx];
+                  const ps2 = PS2_BUTTONS[btnIdx];
                   const action = draftBtn[btnIdx] ?? "none";
                   const pressed = liveBtns[btnIdx] ?? false;
                   const hasAssign = action !== "none";
 
                   return (
-                    <div key={btnIdx} className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all ${
-                      pressed        ? "border-white/40 bg-white/5 shadow-[0_0_8px_rgba(255,255,255,0.1)]"
-                      : hasAssign    ? "border-violet-500/30 bg-violet-500/5"
-                                     : "border-panel-border/40 bg-[oklch(0.16_0.02_250)]"
-                    }`}>
-                      {/* Button symbol badge */}
-                      <div className={`w-10 h-10 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all ${
-                        pressed ? "bg-white/20 border-white/50 text-white scale-110" : `bg-panel border-panel-border ${ps2?.color ?? "text-muted-foreground"}`
+                    <div key={btnIdx} className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all duration-75 ${pressed
+                        ? "border-emerald-400 bg-emerald-500/25 ring-2 ring-emerald-400/80 shadow-[0_0_20px_rgba(16,185,129,0.5)] scale-[1.01]"
+                        : hasAssign
+                          ? "border-violet-500/30 bg-violet-500/5"
+                          : "border-panel-border/40 bg-[oklch(0.16_0.02_250)]"
                       }`}>
+                      {/* Button symbol badge */}
+                      <div className={`w-10 h-10 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all ${pressed
+                          ? "bg-emerald-400 text-slate-950 border-emerald-200 font-extrabold scale-110 shadow-lg"
+                          : `bg-panel border-panel-border ${ps2?.color ?? "text-muted-foreground"}`
+                        }`}>
                         {ps2?.sym ?? btnIdx}
                       </div>
 
                       {/* Label */}
-                      <div className="w-24 shrink-0">
-                        <div className={`font-semibold text-[11px] ${ps2?.color ?? "text-muted-foreground"}`}>
+                      <div className="w-28 shrink-0">
+                        <div className={`font-semibold text-[11px] ${pressed ? "text-emerald-300 font-bold" : ps2?.color ?? "text-muted-foreground"}`}>
                           {ps2?.label ?? `Button ${btnIdx}`}
                         </div>
                         {pressed && (
-                          <div className="text-[8px] text-white/60 font-mono animate-pulse">PRESSED</div>
+                          <div className="text-[9px] text-emerald-300 font-mono font-bold animate-pulse">● PRESSED / DITEKAN</div>
                         )}
                       </div>
 
@@ -382,10 +540,10 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
 
               <div className="space-y-2">
                 {(Object.keys(AXIS_FN_META) as (keyof GPMapping)[]).map(fn => {
-                  const meta   = AXIS_FN_META[fn];
-                  const cur    = draftAxis[fn];
-                  const axisV  = liveAxes[cur.axisIdx] ?? 0;
-                  const pct    = ((applyDZ(cur.invert ? -axisV : axisV) + 1) / 2) * 100;
+                  const meta = AXIS_FN_META[fn];
+                  const cur = draftAxis[fn];
+                  const axisV = liveAxes[cur.axisIdx] ?? 0;
+                  const pct = ((applyDZ(cur.invert ? -axisV : axisV) + 1) / 2) * 100;
                   const isDetecting = detectAxis === fn;
                   return (
                     <div key={fn} className={`rounded-xl border p-3 transition-all ${isDetecting ? "border-violet-500/60 bg-violet-500/5" : "border-panel-border/50 bg-[oklch(0.16_0.024_250)]"}`}>
@@ -444,7 +602,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                           </div>
                           <div className="h-1 w-full bg-panel-border/30 rounded-full overflow-hidden relative">
                             <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/20 z-10" />
-                            <div className={`h-full rounded-full ${Math.abs(v) > DEADZONE ? "bg-accent" : "bg-panel-border/50"}`} style={{ width: `${((v+1)/2)*100}%` }} />
+                            <div className={`h-full rounded-full ${Math.abs(v) > DEADZONE ? "bg-accent" : "bg-panel-border/50"}`} style={{ width: `${((v + 1) / 2) * 100}%` }} />
                           </div>
                         </div>
                       );
@@ -476,58 +634,58 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
 
 // ─── Main Component ─────────────────────────────────────────────────────────────
 function PilotControlsPage() {
-  const clk    = useClock();
+  const clk = useClock();
   const socket = useROVSocket();
 
-  const [gpName,       setGpName]       = useState<string | null>(null);
-  const [channels,     setChannels]     = useState<CH>(NEUTRAL);
-  const [emitCount,    setEmitCount]    = useState(0);
-  const [showDebug,    setShowDebug]    = useState(false);
-  const [showMapping,  setShowMapping]  = useState(false);
-  const [kbEnabled,    setKbEnabled]    = useState(false);
-  const [gpEnabled,    setGpEnabled]    = useState(true);
-  const [lightState,   setLightState]   = useState(false);
+  const [gpName, setGpName] = useState<string | null>(null);
+  const [channels, setChannels] = useState<CH>(NEUTRAL);
+  const [emitCount, setEmitCount] = useState(0);
+  const [showDebug, setShowDebug] = useState(false);
+  const [showMapping, setShowMapping] = useState(false);
+  const [kbEnabled, setKbEnabled] = useState(false);
+  const [gpEnabled, setGpEnabled] = useState(true);
+  const [lightState, setLightState] = useState(false);
   const [gripperState, setGripperState] = useState(false);
-  const [alarmOn,      setAlarmOn]      = useState(true);
-  const [axisMap,      setAxisMap]      = useState<GPMapping>(() => loadLS(LS_AXIS, DEFAULT_AXIS_MAPPING));
-  const [btnMap,       setBtnMap]       = useState<ButtonMapping>(() => loadLS(LS_BTN, DEFAULT_BUTTON_MAPPING));
+  const [alarmOn, setAlarmOn] = useState(true);
+  const [axisMap, setAxisMap] = useState<GPMapping>(() => loadLS(LS_AXIS, DEFAULT_AXIS_MAPPING));
+  const [btnMap, setBtnMap] = useState<ButtonMapping>(() => loadLS(LS_BTN, DEFAULT_BUTTON_MAPPING));
 
-  const socketRef   = useRef(socket);
-  const gpIdxRef    = useRef<number | null>(null);
-  const gpEnRef     = useRef(true);
-  const kbEnRef     = useRef(false);
-  const keysRef     = useRef<Record<string, boolean>>({});
-  const emitCntRef  = useRef(0);
-  const axisMapRef  = useRef(axisMap);
-  const btnMapRef   = useRef(btnMap);
+  const socketRef = useRef(socket);
+  const gpIdxRef = useRef<number | null>(null);
+  const gpEnRef = useRef(true);
+  const kbEnRef = useRef(false);
+  const keysRef = useRef<Record<string, boolean>>({});
+  const emitCntRef = useRef(0);
+  const axisMapRef = useRef(axisMap);
+  const btnMapRef = useRef(btnMap);
   const prevBtnsRef = useRef<boolean[]>([]);
   // Track local light/gripper in refs for button action handlers
-  const lightRef    = useRef(lightState);
-  const gripperRef  = useRef(gripperState);
+  const lightRef = useRef(lightState);
+  const gripperRef = useRef(gripperState);
 
-  useEffect(() => { socketRef.current  = socket;    });
-  useEffect(() => { gpEnRef.current    = gpEnabled; }, [gpEnabled]);
-  useEffect(() => { kbEnRef.current    = kbEnabled; }, [kbEnabled]);
-  useEffect(() => { axisMapRef.current = axisMap;   }, [axisMap]);
-  useEffect(() => { btnMapRef.current  = btnMap;    }, [btnMap]);
-  useEffect(() => { lightRef.current   = lightState;   }, [lightState]);
+  useEffect(() => { socketRef.current = socket; });
+  useEffect(() => { gpEnRef.current = gpEnabled; }, [gpEnabled]);
+  useEffect(() => { kbEnRef.current = kbEnabled; }, [kbEnabled]);
+  useEffect(() => { axisMapRef.current = axisMap; }, [axisMap]);
+  useEffect(() => { btnMapRef.current = btnMap; }, [btnMap]);
+  useEffect(() => { lightRef.current = lightState; }, [lightState]);
   useEffect(() => { gripperRef.current = gripperState; }, [gripperState]);
 
   // Execute action from button press
   const executeAction = useCallback((action: ROVAction) => {
     const s = socketRef.current;
     switch (action) {
-      case "arm_toggle":      s.telemetry?.armed ? s.sendDisarm() : s.sendArm(); break;
-      case "arm":             s.sendArm();    break;
-      case "disarm":          s.sendDisarm(); break;
-      case "light_toggle":    setLightState(v => { const n = !v; lightRef.current = n; s.sendLight(n); return n; }); break;
-      case "gripper_toggle":  setGripperState(v => { const n = !v; gripperRef.current = n; s.sendGripper(n ? "open" : "close"); return n; }); break;
-      case "gripper_open":    setGripperState(true);  s.sendGripper("open");   break;
-      case "gripper_close":   setGripperState(false); s.sendGripper("close");  break;
-      case "mode_toggle":     s.sendSetMode(s.telemetry?.mode === "DEPTH_HOLD" ? "MANUAL" : "DEPTH_HOLD"); break;
-      case "mode_manual":     s.sendSetMode("MANUAL");     break;
+      case "arm_toggle": s.telemetry?.armed ? s.sendDisarm() : s.sendArm(); break;
+      case "arm": s.sendArm(); break;
+      case "disarm": s.sendDisarm(); break;
+      case "light_toggle": setLightState(v => { const n = !v; lightRef.current = n; s.sendLight(n); return n; }); break;
+      case "gripper_toggle": setGripperState(v => { const n = !v; gripperRef.current = n; s.sendGripper(n ? "open" : "close"); return n; }); break;
+      case "gripper_open": setGripperState(true); s.sendGripper("open"); break;
+      case "gripper_close": setGripperState(false); s.sendGripper("close"); break;
+      case "mode_toggle": s.sendSetMode(s.telemetry?.mode === "DEPTH_HOLD" ? "MANUAL" : "DEPTH_HOLD"); break;
+      case "mode_manual": s.sendSetMode("MANUAL"); break;
       case "mode_depth_hold": s.sendSetMode("DEPTH_HOLD"); break;
-      case "emergency_stop":  s.sendEmergencyStop(); break;
+      case "emergency_stop": s.sendEmergencyStop(); break;
       default: break;
     }
   }, []);
@@ -553,25 +711,41 @@ function PilotControlsPage() {
         } else {
           // Build movement channels from axis mapping
           ch = {
-            1: axisPWM(gp.axes[am.lateral.axisIdx]  ?? 0, am.lateral.invert),
-            2: axisPWM(gp.axes[am.forward.axisIdx]  ?? 0, am.forward.invert),
+            1: axisPWM(gp.axes[am.lateral.axisIdx] ?? 0, am.lateral.invert),
+            2: axisPWM(gp.axes[am.forward.axisIdx] ?? 0, am.forward.invert),
             3: axisPWM(gp.axes[am.throttle.axisIdx] ?? 0, am.throttle.invert),
-            4: axisPWM(gp.axes[am.yaw.axisIdx]      ?? 0, am.yaw.invert),
+            4: axisPWM(gp.axes[am.yaw.axisIdx] ?? 0, am.yaw.invert),
           };
 
-          // D-Pad movement fallback (Buttons 12=Up, 13=Down, 14=Left, 15=Right)
+          // D-Pad movement support via Axis #9 (POV Hat) or Buttons 12-15
           const bm = btnMapRef.current;
+          const povParsed = parsePOVHat(gp.axes[9] ?? gp.axes[4] ?? 0);
+
           if (ch[2] === 1500) {
-            if (gp.buttons[12]?.pressed && (!bm[12] || bm[12] === "none")) ch[2] = 1800; // D-pad Up -> Forward
-            else if (gp.buttons[13]?.pressed && (!bm[13] || bm[13] === "none")) ch[2] = 1200; // D-pad Down -> Backward
+            if (povParsed.up) ch[2] = 1800;     // D-Pad Up -> Forward (1800)
+            else if (povParsed.down) ch[2] = 1200; // D-Pad Down -> Backward (1200)
           }
           if (ch[1] === 1500) {
-            if (gp.buttons[15]?.pressed && (!bm[15] || bm[15] === "none")) ch[1] = 1800; // D-pad Right -> Lateral Right
-            else if (gp.buttons[14]?.pressed && (!bm[14] || bm[14] === "none")) ch[1] = 1200; // D-pad Left -> Lateral Left
+            if (povParsed.left) ch[1] = 1200;   // D-Pad Left -> Lateral Left (1200)
+            else if (povParsed.right) ch[1] = 1800; // D-Pad Right -> Lateral Right (1800)
+          }
+
+          // Fallback D-Pad Buttons 12=Up, 13=Down, 14=Left, 15=Right
+          if (ch[2] === 1500) {
+            if (gp.buttons[12]?.pressed && (!bm[12] || bm[12] === "none")) ch[2] = 1800;
+            else if (gp.buttons[13]?.pressed && (!bm[13] || bm[13] === "none")) ch[2] = 1200;
+          }
+          if (ch[1] === 1500) {
+            if (gp.buttons[15]?.pressed && (!bm[15] || bm[15] === "none")) ch[1] = 1800;
+            else if (gp.buttons[14]?.pressed && (!bm[14] || bm[14] === "none")) ch[1] = 1200;
           }
 
           // Button press detection (rising edge only)
-          const btns = Array.from(gp.buttons).map(b => b.pressed);
+          const btns = Array.from(gp.buttons).map(b => b.pressed || (typeof b === "object" && b.value > 0.5));
+          if (povParsed.up) btns[12] = true;
+          if (povParsed.down) btns[13] = true;
+          if (povParsed.left) btns[14] = true;
+          if (povParsed.right) btns[15] = true;
           const prev = prevBtnsRef.current;
           btns.forEach((pressed, i) => {
             if (pressed && !(prev[i] ?? false)) {
@@ -611,38 +785,38 @@ function PilotControlsPage() {
   }, []);
 
   useEffect(() => {
-    const KEYS = ["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"];
+    const KEYS = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
     function onDown(e: KeyboardEvent) { const k = e.key.toLowerCase(); if (KEYS.includes(k)) { if (k.startsWith("arrow")) e.preventDefault(); keysRef.current[k] = true; } }
-    function onUp(e: KeyboardEvent)   { keysRef.current[e.key.toLowerCase()] = false; }
+    function onUp(e: KeyboardEvent) { keysRef.current[e.key.toLowerCase()] = false; }
     window.addEventListener("keydown", onDown);
-    window.addEventListener("keyup",   onUp);
+    window.addEventListener("keyup", onUp);
     return () => { window.removeEventListener("keydown", onDown); window.removeEventListener("keyup", onUp); };
   }, []);
 
-  const roll   = socket.trajectory?.orientation?.roll  ?? 0;
-  const pitch  = socket.trajectory?.orientation?.pitch ?? 0;
-  const yaw    = socket.trajectory?.orientation?.yaw   ?? 0;
-  const depth  = socket.telemetry?.depth               ?? 0;
-  const volt   = socket.telemetry?.battery_voltage     ?? 0;
-  const batPct = socket.telemetry?.battery_remaining   ?? 0;
+  const roll = socket.trajectory?.orientation?.roll ?? 0;
+  const pitch = socket.trajectory?.orientation?.pitch ?? 0;
+  const yaw = socket.trajectory?.orientation?.yaw ?? 0;
+  const depth = socket.telemetry?.depth ?? 0;
+  const volt = socket.telemetry?.battery_voltage ?? 0;
+  const batPct = socket.telemetry?.battery_remaining ?? 0;
 
   const lastAlarmRef = useRef(0);
   useEffect(() => {
     if (!alarmOn || depth <= 1.8) return;
     const t = Date.now(); if (t - lastAlarmRef.current < 5000) return; lastAlarmRef.current = t;
-    try { const Ctx = window.AudioContext ?? (window as any).webkitAudioContext; if (Ctx) { const ctx = new Ctx(); const osc = ctx.createOscillator(); const g = ctx.createGain(); osc.type = "sawtooth"; osc.frequency.setValueAtTime(880, ctx.currentTime); g.gain.setValueAtTime(0.05, ctx.currentTime); osc.connect(g); g.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.35); } } catch {}
-    if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance("Warning. Critical Depth Threshold Reached."); u.lang="en-US"; u.rate=1.15; window.speechSynthesis.speak(u); }
+    try { const Ctx = window.AudioContext ?? (window as any).webkitAudioContext; if (Ctx) { const ctx = new Ctx(); const osc = ctx.createOscillator(); const g = ctx.createGain(); osc.type = "sawtooth"; osc.frequency.setValueAtTime(880, ctx.currentTime); g.gain.setValueAtTime(0.05, ctx.currentTime); osc.connect(g); g.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.35); } } catch { }
+    if ("speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance("Warning. Critical Depth Threshold Reached."); u.lang = "en-US"; u.rate = 1.15; window.speechSynthesis.speak(u); }
   }, [depth, alarmOn]);
 
-  const toggleArm  = () => socket.telemetry?.armed ? socket.sendDisarm() : socket.sendArm();
+  const toggleArm = () => socket.telemetry?.armed ? socket.sendDisarm() : socket.sendArm();
   const toggleMode = () => socket.sendSetMode(socket.telemetry?.mode === "DEPTH_HOLD" ? "MANUAL" : "DEPTH_HOLD");
   const toggleLight = () => { const n = !lightState; setLightState(n); lightRef.current = n; socket.sendLight(n); };
-  const toggleGrip  = () => { const n = !gripperState; setGripperState(n); gripperRef.current = n; socket.sendGripper(n ? "open" : "close"); };
+  const toggleGrip = () => { const n = !gripperState; setGripperState(n); gripperRef.current = n; socket.sendGripper(n ? "open" : "close"); };
 
   const handleSaveMapping = useCallback((axis: GPMapping, btn: ButtonMapping) => { setAxisMap(axis); setBtnMap(btn); }, []);
 
   const gpConn = gpName !== null;
-  const pct    = (v: number) => ((v - 1100) / 800) * 100;
+  const pct = (v: number) => ((v - 1100) / 800) * 100;
   const active = (v: number) => v !== 1500;
 
   const assignedBtnCount = Object.values(btnMap).filter(a => a !== "none").length;
@@ -669,7 +843,7 @@ function PilotControlsPage() {
           </button>
           <div className="text-right">
             <div className="font-mono text-xs leading-none">{clk.toLocaleTimeString("en-GB", { hour12: false })}</div>
-            <div className="text-[10px] text-muted-foreground mt-1">{clk.toLocaleDateString("en-GB", { weekday: "long" })}, {clk.toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" })}</div>
+            <div className="text-[10px] text-muted-foreground mt-1">{clk.toLocaleDateString("en-GB", { weekday: "long" })}, {clk.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
           </div>
         </div>
       </header>
@@ -678,14 +852,14 @@ function PilotControlsPage() {
         <div className="shrink-0 border-b border-yellow-500/30 bg-yellow-500/5 px-4 py-2">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[10px] font-mono">
             {[
-              { l:"SOCKET",   v: socket.connected       ? "✓ CONNECTED" : "✗ DISCONNECTED", ok: socket.connected },
-              { l:"MAVLINK",  v: socket.mavlinkConnected? "✓ MAV_OK"    : "✗ NO_LINK",      ok: socket.mavlinkConnected },
-              { l:"ARMED",    v: socket.telemetry?.armed? "✓ ARMED"     : "✗ DISARMED",     ok: !!socket.telemetry?.armed },
-              { l:"PACKETS",  v: `${emitCount} sent`,                                        ok: emitCount > 0 },
-              { l:"GAMEPAD",  v: gpConn ? `✓ idx=${gpIdxRef.current}` : "✗ NONE",          ok: gpConn },
-              { l:"RAW PWM",  v: `${channels[1]}/${channels[2]}/${channels[3]}/${channels[4]}`, ok: true },
-              { l:"BTN MAP",  v: `${assignedBtnCount} buttons assigned`,                    ok: assignedBtnCount > 0 },
-              { l:"LATENCY",  v: socket.latencyMs ? `${socket.latencyMs}ms` : "N/A",        ok: !!socket.latencyMs },
+              { l: "SOCKET", v: socket.connected ? "✓ CONNECTED" : "✗ DISCONNECTED", ok: socket.connected },
+              { l: "MAVLINK", v: socket.mavlinkConnected ? "✓ MAV_OK" : "✗ NO_LINK", ok: socket.mavlinkConnected },
+              { l: "ARMED", v: socket.telemetry?.armed ? "✓ ARMED" : "✗ DISARMED", ok: !!socket.telemetry?.armed },
+              { l: "PACKETS", v: `${emitCount} sent`, ok: emitCount > 0 },
+              { l: "GAMEPAD", v: gpConn ? `✓ idx=${gpIdxRef.current}` : "✗ NONE", ok: gpConn },
+              { l: "RAW PWM", v: `${channels[1]}/${channels[2]}/${channels[3]}/${channels[4]}`, ok: true },
+              { l: "BTN MAP", v: `${assignedBtnCount} buttons assigned`, ok: assignedBtnCount > 0 },
+              { l: "LATENCY", v: socket.latencyMs ? `${socket.latencyMs}ms` : "N/A", ok: !!socket.latencyMs },
             ].map(r => (
               <div key={r.l}>
                 <div className="text-yellow-400 font-bold mb-1">{r.l}</div>
@@ -707,7 +881,7 @@ function PilotControlsPage() {
               <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Attitude Indicator</span>
               <div className="flex-1 min-h-[130px] bg-[oklch(0.14_0.028_250)] rounded-lg border border-panel-border grid place-items-center relative">
                 <img src={rovImage} alt="ROV" className="w-full h-full object-contain p-3"
-                  style={{ transform: `rotate(${roll}deg) scale(${Math.max(0.65, 1-Math.abs(pitch)/180)})`, transition:"transform 0.1s ease-out" }} />
+                  style={{ transform: `rotate(${roll}deg) scale(${Math.max(0.65, 1 - Math.abs(pitch) / 180)})`, transition: "transform 0.1s ease-out" }} />
                 <div className="absolute bottom-1.5 left-2 font-mono text-[10px] text-muted-foreground">R:{roll.toFixed(1)}° P:{pitch.toFixed(1)}°</div>
               </div>
             </div>
@@ -715,14 +889,14 @@ function PilotControlsPage() {
               <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Compass (Yaw)</span>
               <div className="flex-1 min-h-[130px] bg-[oklch(0.14_0.028_250)] rounded-lg border border-panel-border grid place-items-center relative">
                 <svg viewBox="0 0 100 100" className="w-full h-full p-2.5">
-                  <g transform={`rotate(${yaw},50,50)`} style={{transition:"transform 0.1s ease-out"}}>
-                    <circle cx="50" cy="50" r="30" fill="none" stroke="var(--color-panel-border)" strokeWidth="1.5"/>
-                    <polygon points="50,15 45,25 55,25" fill="var(--color-data)"/>
+                  <g transform={`rotate(${yaw},50,50)`} style={{ transition: "transform 0.1s ease-out" }}>
+                    <circle cx="50" cy="50" r="30" fill="none" stroke="var(--color-panel-border)" strokeWidth="1.5" />
+                    <polygon points="50,15 45,25 55,25" fill="var(--color-data)" />
                     <text x="50" y="35" fontSize="8" fill="var(--color-data)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">N</text>
-                    <line x1="50" y1="25" x2="50" y2="75" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2"/>
-                    <line x1="25" y1="50" x2="75" y2="50" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2"/>
+                    <line x1="50" y1="25" x2="50" y2="75" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2" />
+                    <line x1="25" y1="50" x2="75" y2="50" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2" />
                   </g>
-                  <circle cx="50" cy="50" r="3" fill="#fff"/>
+                  <circle cx="50" cy="50" r="3" fill="#fff" />
                 </svg>
                 <div className="absolute bottom-1.5 right-2 font-mono text-[10px] text-muted-foreground">HDG:{yaw.toFixed(1)}°</div>
               </div>
@@ -738,17 +912,16 @@ function PilotControlsPage() {
           <div className="border-b border-panel-border/60 pb-2 shrink-0"><span className="label-caps">Pilot Switchboard</span></div>
           <div className="flex-1 flex flex-col gap-2 py-3 overflow-y-auto">
             {[
-              { label: socket.telemetry?.armed ? "THRUSTERS ARMED — CLICK TO DISARM" : "ARM VESSEL MOTORS", fn: toggleArm, active: socket.telemetry?.armed, color: "red", icon: <Power size={16}/> },
-              { label: socket.telemetry?.mode === "DEPTH_HOLD" ? "STABILIZER: DEPTH HOLD" : "CONTROL: MANUAL MODE", fn: toggleMode, active: socket.telemetry?.mode === "DEPTH_HOLD", color: "accent", icon: <ToggleLeft size={16}/> },
-              { label: lightState ? "LED FLOODLIGHT: ON" : "LED FLOODLIGHT: OFF", fn: toggleLight, active: lightState, color: "yellow", icon: <Play size={16}/> },
-              { label: gripperState ? "VESSEL GRIPPER: OPEN" : "VESSEL GRIPPER: CLOSE", fn: toggleGrip, active: gripperState, color: "green", icon: <RotateCcw size={16}/> },
+              { label: socket.telemetry?.armed ? "THRUSTERS ARMED — CLICK TO DISARM" : "ARM VESSEL MOTORS", fn: toggleArm, active: socket.telemetry?.armed, color: "red", icon: <Power size={16} /> },
+              { label: socket.telemetry?.mode === "DEPTH_HOLD" ? "STABILIZER: DEPTH HOLD" : "CONTROL: MANUAL MODE", fn: toggleMode, active: socket.telemetry?.mode === "DEPTH_HOLD", color: "accent", icon: <ToggleLeft size={16} /> },
+              { label: lightState ? "LED FLOODLIGHT: ON" : "LED FLOODLIGHT: OFF", fn: toggleLight, active: lightState, color: "yellow", icon: <Play size={16} /> },
+              { label: gripperState ? "VESSEL GRIPPER: OPEN" : "VESSEL GRIPPER: CLOSE", fn: toggleGrip, active: gripperState, color: "green", icon: <RotateCcw size={16} /> },
             ].map((btn, i) => (
               <button key={i} onClick={btn.fn}
-                className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors shrink-0 ${
-                  btn.active
+                className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors shrink-0 ${btn.active
                     ? btn.color === "accent" ? "bg-accent/20 text-accent border-accent/30" : btn.color === "yellow" ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30" : btn.color === "green" ? "bg-green-500/20 text-green-500 border-green-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"
                     : "bg-panel border-panel-border text-muted-foreground hover:text-foreground hover:bg-panel/60"
-                }`}>
+                  }`}>
                 {btn.icon}<span>{btn.label}</span>
               </button>
             ))}
@@ -758,36 +931,41 @@ function PilotControlsPage() {
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Pilot Input</span>
                 <div className="flex items-center gap-1">
+                  <Link to="/gamepad-test"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border transition-all cursor-pointer bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                    title="Buka Diagnostic Tester Gamepad">
+                    <Gamepad2 size={10} /> TESTER
+                  </Link>
                   <button onClick={() => setShowMapping(true)}
                     className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border transition-all cursor-pointer bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20">
-                    <Settings size={10}/> MAPPING {assignedBtnCount > 0 && <span className="bg-violet-500/30 rounded-full px-1">{assignedBtnCount}</span>}
+                    <Settings size={10} /> MAPPING {assignedBtnCount > 0 && <span className="bg-violet-500/30 rounded-full px-1">{assignedBtnCount}</span>}
                   </button>
                   <button onClick={() => setKbEnabled(v => !v)}
                     className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border transition-all cursor-pointer ${kbEnabled ? "bg-accent/20 text-accent border-accent/40" : "bg-panel/50 border-panel-border/50 text-muted-foreground hover:text-foreground"}`}>
-                    <Keyboard size={10}/> KB
+                    <Keyboard size={10} /> KB
                   </button>
                   <button onClick={() => setGpEnabled(v => !v)}
                     className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border transition-all cursor-pointer ${gpEnabled ? "bg-green-500/20 text-green-400 border-green-500/40" : "bg-panel/50 border-panel-border/50 text-muted-foreground"}`}>
-                    <Gamepad2 size={10}/> {gpEnabled ? "GP ON" : "GP OFF"}
+                    <Gamepad2 size={10} /> {gpEnabled ? "GP ON" : "GP OFF"}
                   </button>
                 </div>
               </div>
 
               <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[10px] font-mono font-bold ${gpConn ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : kbEnabled ? "bg-accent/10 border-accent/30 text-accent" : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${gpConn ? "bg-emerald-400 animate-pulse" : kbEnabled ? "bg-accent" : "bg-red-500"}`}/>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${gpConn ? "bg-emerald-400 animate-pulse" : kbEnabled ? "bg-accent" : "bg-red-500"}`} />
                 <span className="truncate">{gpConn ? `GAMEPAD: ${gpName}` : kbEnabled ? "KEYBOARD (WASD + Arrows)" : "NO INPUT — Connect gamepad or enable KB"}</span>
               </div>
 
               {/* Button mapping badges (compact live view) */}
               {gpConn && assignedBtnCount > 0 && (
                 <div className="flex flex-wrap gap-1">
-                  {Object.entries(btnMap).filter(([,a]) => a !== "none").map(([idx, action]) => {
+                  {Object.entries(btnMap).filter(([, a]) => a !== "none").map(([idx, action]) => {
                     const ps2 = PS2_BUTTONS[Number(idx)];
                     return (
                       <div key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-panel border border-panel-border/50 text-[8px] font-mono">
                         <span className={ps2?.color ?? ""}>{ps2?.sym ?? `B${idx}`}</span>
                         <span className="text-muted-foreground">→</span>
-                        <span className={ACTION_META[action as ROVAction]?.color ?? ""}>{action.replace(/_/g," ")}</span>
+                        <span className={ACTION_META[action as ROVAction]?.color ?? ""}>{action.replace(/_/g, " ")}</span>
                       </div>
                     );
                   })}
@@ -801,15 +979,15 @@ function PilotControlsPage() {
               )}
 
               <div className="grid grid-cols-2 gap-1.5">
-                {([{label:"CH1 Lateral",v:channels[1]},{label:"CH2 Forward",v:channels[2]},{label:"CH3 Throttle",v:channels[3]},{label:"CH4 Yaw",v:channels[4]}] as const).map(ch => (
+                {([{ label: "CH1 Lateral", v: channels[1] }, { label: "CH2 Forward", v: channels[2] }, { label: "CH3 Throttle", v: channels[3] }, { label: "CH4 Yaw", v: channels[4] }] as const).map(ch => (
                   <div key={ch.label} className={`p-1.5 rounded-lg border transition-colors ${active(ch.v) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-black/10 border-panel-border/20"}`}>
                     <div className="flex justify-between items-center mb-1 text-[8px] font-mono">
                       <span className="text-muted-foreground">{ch.label}</span>
                       <span className={`font-bold tabular-nums ${active(ch.v) ? "text-emerald-400" : "text-muted-foreground"}`}>{ch.v}</span>
                     </div>
                     <div className="h-1.5 w-full bg-panel-border/30 rounded-full overflow-hidden relative">
-                      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/25 z-10"/>
-                      <div className={`h-full rounded-full transition-all duration-75 ${active(ch.v) ? "bg-gradient-to-r from-emerald-500 to-cyan-400" : "bg-panel-border/60"}`} style={{width:`${pct(ch.v)}%`}}/>
+                      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/25 z-10" />
+                      <div className={`h-full rounded-full transition-all duration-75 ${active(ch.v) ? "bg-gradient-to-r from-emerald-500 to-cyan-400" : "bg-panel-border/60"}`} style={{ width: `${pct(ch.v)}%` }} />
                     </div>
                   </div>
                 ))}
@@ -834,7 +1012,7 @@ function PilotControlsPage() {
           <div className="border-t border-panel-border/40 pt-2.5 shrink-0">
             <button onClick={socket.sendEmergencyStop}
               className="w-full flex items-center justify-center gap-2 bg-[color:var(--color-danger)] text-white font-bold py-2 rounded-lg text-xs tracking-wider hover:opacity-90 cursor-pointer transition-opacity">
-              <Power size={13}/> KILL POWER / EMERGENCY STOP
+              <Power size={13} /> KILL POWER / EMERGENCY STOP
             </button>
           </div>
         </div>
@@ -844,7 +1022,7 @@ function PilotControlsPage() {
           <div className="flex flex-col gap-2.5 flex-1">
             <div className="border-b border-panel-border/60 pb-2 shrink-0"><span className="label-caps">Vessel Diagnostics</span></div>
             <div className="space-y-2 text-xs">
-              {[{label:"Vessel Depth",val:`${depth.toFixed(2)} m`},{label:"Power Voltage",val:`${volt.toFixed(1)} V`},{label:"Battery Capacity",val:`${batPct}%`}].map(r => (
+              {[{ label: "Vessel Depth", val: `${depth.toFixed(2)} m` }, { label: "Power Voltage", val: `${volt.toFixed(1)} V` }, { label: "Battery Capacity", val: `${batPct}%` }].map(r => (
                 <div key={r.label} className="flex justify-between items-center border-b border-panel-border/20 pb-1.5">
                   <span className="label-caps">{r.label}</span>
                   <span className="text-[color:var(--color-data)] font-bold font-mono">{r.val}</span>
@@ -853,7 +1031,7 @@ function PilotControlsPage() {
               <div className="flex justify-between items-center">
                 <span className="label-caps">MAVLink</span>
                 <span className={`font-bold font-mono flex items-center gap-1.5 ${socket.mavlinkConnected ? "text-[color:var(--color-success)]" : "text-red-500"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${socket.mavlinkConnected ? "bg-[color:var(--color-success)]" : "bg-red-500"}`}/>
+                  <span className={`w-1.5 h-1.5 rounded-full ${socket.mavlinkConnected ? "bg-[color:var(--color-success)]" : "bg-red-500"}`} />
                   {socket.mavlinkConnected ? "MAV_OK" : "NO_SYS_LINK"}
                 </span>
               </div>
@@ -861,9 +1039,9 @@ function PilotControlsPage() {
 
             <div className="bg-[oklch(0.15_0.028_250)] rounded-lg p-2.5 border border-panel-border/70 mt-1.5 flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><ShieldAlert className="text-red-500" size={15}/><span className="text-[11px] text-foreground font-semibold uppercase tracking-wide">Audio Depth Alarm</span></div>
+                <div className="flex items-center gap-2"><ShieldAlert className="text-red-500" size={15} /><span className="text-[11px] text-foreground font-semibold uppercase tracking-wide">Audio Depth Alarm</span></div>
                 <button onClick={() => setAlarmOn(v => !v)} className={`p-1.5 rounded-md border transition-colors cursor-pointer ${alarmOn ? "bg-red-500/20 text-red-400 border-red-500/40" : "bg-panel border-panel-border text-muted-foreground"}`}>
-                  {alarmOn ? <Volume2 size={13}/> : <VolumeX size={13}/>}
+                  {alarmOn ? <Volume2 size={13} /> : <VolumeX size={13} />}
                 </button>
               </div>
               <div className="text-[11px] text-muted-foreground leading-relaxed">Triggers if depth exceeds <strong className="text-accent font-bold">1.8 meters</strong>.</div>
@@ -884,7 +1062,7 @@ function PilotControlsPage() {
       <footer className="h-10 shrink-0 border-t border-panel-border px-4 flex items-center justify-between text-xs">
         <div className="flex items-center gap-5">
           <div className="flex items-center gap-1.5"><span className="label-caps">Mode</span><span className="font-mono text-accent font-bold">{socket.telemetry?.mode ?? "MANUAL"}</span></div>
-          <div className="h-3.5 w-px bg-panel-border/60"/>
+          <div className="h-3.5 w-px bg-panel-border/60" />
           <div className="flex items-center gap-1.5"><span className="label-caps">Hardware Stabilizers</span><span className="font-mono font-bold text-[color:var(--color-success)]">ACTIVE</span></div>
         </div>
         <div className="font-mono text-[11px] text-muted-foreground">Fail-Safe: MAV_AUTO_LAND</div>

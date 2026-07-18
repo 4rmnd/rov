@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VisionRouteImport } from './routes/vision'
 import { Route as NavigationRouteImport } from './routes/navigation'
+import { Route as GamepadTestRouteImport } from './routes/gamepad-test'
 import { Route as ControlRouteImport } from './routes/control'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -22,6 +23,11 @@ const VisionRoute = VisionRouteImport.update({
 const NavigationRoute = NavigationRouteImport.update({
   id: '/navigation',
   path: '/navigation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GamepadTestRoute = GamepadTestRouteImport.update({
+  id: '/gamepad-test',
+  path: '/gamepad-test',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ControlRoute = ControlRouteImport.update({
@@ -38,12 +44,14 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/control': typeof ControlRoute
+  '/gamepad-test': typeof GamepadTestRoute
   '/navigation': typeof NavigationRoute
   '/vision': typeof VisionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/control': typeof ControlRoute
+  '/gamepad-test': typeof GamepadTestRoute
   '/navigation': typeof NavigationRoute
   '/vision': typeof VisionRoute
 }
@@ -51,20 +59,28 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/control': typeof ControlRoute
+  '/gamepad-test': typeof GamepadTestRoute
   '/navigation': typeof NavigationRoute
   '/vision': typeof VisionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/control' | '/navigation' | '/vision'
+  fullPaths: '/' | '/control' | '/gamepad-test' | '/navigation' | '/vision'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/control' | '/navigation' | '/vision'
-  id: '__root__' | '/' | '/control' | '/navigation' | '/vision'
+  to: '/' | '/control' | '/gamepad-test' | '/navigation' | '/vision'
+  id:
+    | '__root__'
+    | '/'
+    | '/control'
+    | '/gamepad-test'
+    | '/navigation'
+    | '/vision'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ControlRoute: typeof ControlRoute
+  GamepadTestRoute: typeof GamepadTestRoute
   NavigationRoute: typeof NavigationRoute
   VisionRoute: typeof VisionRoute
 }
@@ -83,6 +99,13 @@ declare module '@tanstack/react-router' {
       path: '/navigation'
       fullPath: '/navigation'
       preLoaderRoute: typeof NavigationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gamepad-test': {
+      id: '/gamepad-test'
+      path: '/gamepad-test'
+      fullPath: '/gamepad-test'
+      preLoaderRoute: typeof GamepadTestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/control': {
@@ -105,6 +128,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ControlRoute: ControlRoute,
+  GamepadTestRoute: GamepadTestRoute,
   NavigationRoute: NavigationRoute,
   VisionRoute: VisionRoute,
 }

@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Sidebar } from "../components/Sidebar";
+import { GlobalGamepadController } from "../components/GlobalGamepadController";
 
 function NotFoundComponent() {
   return (
@@ -75,6 +76,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
+      <GlobalGamepadController />
       <div className="h-screen w-screen overflow-hidden bg-background">
         {/* Kepadatan tampilan yang disetujui (setara browser zoom 75%), dipermanenkan
             via transform:scale (bukan properti `zoom` non-standar yang sempat bikin
