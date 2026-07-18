@@ -47,10 +47,10 @@ export type AxisMap   = { axisIdx: number; invert: boolean };
 export type GPMapping = { lateral: AxisMap; forward: AxisMap; throttle: AxisMap; yaw: AxisMap };
 
 const DEFAULT_AXIS_MAPPING: GPMapping = {
-  lateral:  { axisIdx: 0, invert: false },
-  forward:  { axisIdx: 1, invert: true  },
-  throttle: { axisIdx: 3, invert: true  },
-  yaw:      { axisIdx: 2, invert: false },
+  lateral:  { axisIdx: 0, invert: false }, // Left Stick X  (x360ce Axis 1)
+  forward:  { axisIdx: 1, invert: true  }, // Left Stick Y  (x360ce IAxis 2)
+  throttle: { axisIdx: 2, invert: true  }, // Right Stick Y (x360ce IAxis 3)
+  yaw:      { axisIdx: 5, invert: false }, // Right Stick X (x360ce Axis 6 -> 0-index Axis 5)
 };
 
 // ── Button Mapping ────────────────────────────────────────────────────────────
@@ -398,7 +398,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                           <span className="text-[9px] text-muted-foreground font-mono shrink-0">Axis</span>
                           <select value={cur.axisIdx} onChange={e => setDraftAxis(prev => ({ ...prev, [fn]: { ...prev[fn], axisIdx: Number(e.target.value) } }))}
                             className="bg-panel border border-panel-border rounded-lg px-2 py-1 text-[11px] font-mono text-foreground cursor-pointer focus:outline-none w-20 shrink-0">
-                            {(liveAxes.length > 0 ? liveAxes : Array(8).fill(0)).map((_, i) => (
+                            {Array.from({ length: Math.max(10, liveAxes.length) }, (_, i) => (
                               <option key={i} value={i}>Axis {i}</option>
                             ))}
                           </select>
@@ -429,11 +429,12 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                 })}
               </div>
 
-              {gpAvail && liveAxes.length > 0 && (
+              {gpAvail && (
                 <div>
                   <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">All Live Axes</div>
                   <div className="grid grid-cols-4 gap-1.5">
-                    {liveAxes.map((v, i) => {
+                    {Array.from({ length: Math.max(8, liveAxes.length) }, (_, i) => {
+                      const v = liveAxes[i] ?? 0;
                       const used = Object.values(draftAxis).some(m => m.axisIdx === i);
                       return (
                         <div key={i} className={`p-2 rounded-lg border ${used ? "border-accent/30 bg-accent/5" : "border-panel-border/30 bg-black/10"}`}>
@@ -558,8 +559,18 @@ function PilotControlsPage() {
             4: axisPWM(gp.axes[am.yaw.axisIdx]      ?? 0, am.yaw.invert),
           };
 
+          // D-Pad movement fallback (Buttons 12=Up, 13=Down, 14=Left, 15=Right)
+          const bm = btnMapRef.current;
+          if (ch[2] === 1500) {
+            if (gp.buttons[12]?.pressed && (!bm[12] || bm[12] === "none")) ch[2] = 1800; // D-pad Up -> Forward
+            else if (gp.buttons[13]?.pressed && (!bm[13] || bm[13] === "none")) ch[2] = 1200; // D-pad Down -> Backward
+          }
+          if (ch[1] === 1500) {
+            if (gp.buttons[15]?.pressed && (!bm[15] || bm[15] === "none")) ch[1] = 1800; // D-pad Right -> Lateral Right
+            else if (gp.buttons[14]?.pressed && (!bm[14] || bm[14] === "none")) ch[1] = 1200; // D-pad Left -> Lateral Left
+          }
+
           // Button press detection (rising edge only)
-          const bm   = btnMapRef.current;
           const btns = Array.from(gp.buttons).map(b => b.pressed);
           const prev = prevBtnsRef.current;
           btns.forEach((pressed, i) => {
