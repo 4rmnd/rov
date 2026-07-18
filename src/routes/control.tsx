@@ -76,31 +76,41 @@ const ACTION_META: Record<ROVAction, { label: string; color: string }> = {
   emergency_stop:  { label: "EMERGENCY STOP",              color: "text-red-500" },
 };
 
-// PS2 stick via USB adapter — standard HID button layout
+// PS2 stick via USB adapter — corrected HID button layout
+// Verified order: Triangle=0, Circle=1, Cross=2, Square=3
+// Shoulder: L2=4, R2=5, L1=6, R1=7  (L1/L2 and R1/R2 are swapped vs naive expectation)
+// Select=8, Start=9, L3=10, R3=11
+// D-pad: beberapa adapter map ke btn 12-15, sebagian lain via axes — lihat tab Axis untuk cek
 const PS2_BUTTONS: Record<number, { label: string; sym: string; color: string }> = {
-  0:  { label: "Cross ×",     sym: "×",  color: "text-sky-400"    },
-  1:  { label: "Circle ○",    sym: "○",  color: "text-red-400"    },
-  2:  { label: "Square □",    sym: "□",  color: "text-pink-400"   },
-  3:  { label: "Triangle △",  sym: "△",  color: "text-emerald-400"},
-  4:  { label: "L1",          sym: "L1", color: "text-slate-400"  },
-  5:  { label: "R1",          sym: "R1", color: "text-slate-400"  },
-  6:  { label: "L2",          sym: "L2", color: "text-slate-400"  },
-  7:  { label: "R2",          sym: "R2", color: "text-slate-400"  },
-  8:  { label: "Select",      sym: "SL", color: "text-slate-400"  },
-  9:  { label: "Start",       sym: "ST", color: "text-slate-400"  },
-  10: { label: "L3 (click)",  sym: "L3", color: "text-slate-500"  },
-  11: { label: "R3 (click)",  sym: "R3", color: "text-slate-500"  },
-  12: { label: "D-pad ↑",     sym: "↑",  color: "text-slate-400"  },
-  13: { label: "D-pad ↓",     sym: "↓",  color: "text-slate-400"  },
-  14: { label: "D-pad ←",     sym: "←",  color: "text-slate-400"  },
-  15: { label: "D-pad →",     sym: "→",  color: "text-slate-400"  },
+  0:  { label: "Triangle △",        sym: "△",  color: "text-emerald-400" },
+  1:  { label: "Circle ○",          sym: "○",  color: "text-red-400"     },
+  2:  { label: "Cross ×",           sym: "×",  color: "text-sky-400"     },
+  3:  { label: "Square □",          sym: "□",  color: "text-pink-400"    },
+  4:  { label: "L2",                sym: "L2", color: "text-violet-400"  },
+  5:  { label: "R2",                sym: "R2", color: "text-violet-400"  },
+  6:  { label: "L1",                sym: "L1", color: "text-amber-400"   },
+  7:  { label: "R1",                sym: "R1", color: "text-amber-400"   },
+  8:  { label: "Select",            sym: "SL", color: "text-slate-400"   },
+  9:  { label: "Start",             sym: "ST", color: "text-slate-400"   },
+  10: { label: "L3 (L-stick click)",sym: "L3", color: "text-cyan-400"    },
+  11: { label: "R3 (R-stick click)",sym: "R3", color: "text-cyan-400"    },
+  12: { label: "D-pad ↑",           sym: "↑",  color: "text-slate-400"   },
+  13: { label: "D-pad ↓",           sym: "↓",  color: "text-slate-400"   },
+  14: { label: "D-pad ←",           sym: "←",  color: "text-slate-400"   },
+  15: { label: "D-pad →",           sym: "→",  color: "text-slate-400"   },
+  16: { label: "Btn 16",            sym: "16", color: "text-slate-500"   },
+  17: { label: "Btn 17",            sym: "17", color: "text-slate-500"   },
+  18: { label: "Btn 18",            sym: "18", color: "text-slate-500"   },
+  19: { label: "Btn 19",            sym: "19", color: "text-slate-500"   },
 };
 
+// Default mapping pakai index yang sudah dikoreksi:
+// Triangle=0, Circle=1, Cross=2, Square=3, Start=9
 const DEFAULT_BUTTON_MAPPING: ButtonMapping = {
-  0:  "arm_toggle",     // Cross ×
+  0:  "mode_toggle",    // Triangle △
   1:  "gripper_toggle", // Circle ○
-  2:  "light_toggle",   // Square □
-  3:  "mode_toggle",    // Triangle △
+  2:  "arm_toggle",     // Cross ×
+  3:  "light_toggle",   // Square □
   9:  "emergency_stop", // Start
 };
 
@@ -210,7 +220,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
   const removeButton = (btnIdx: number) => {
     setDraftBtn(prev => { const n = { ...prev }; delete n[btnIdx]; return n; });
   };
-  // All button slots (assigned OR detected live)
+  // All button slots: assigned + live detected + all known PS2 buttons (up to 20)
   const allBtnIndices = Array.from(new Set([
     ...Object.keys(draftBtn).map(Number),
     ...liveBtns.map((_, i) => i),
@@ -262,7 +272,13 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                 Button → ROV Action Assignment
               </div>
               <div className="text-[9px] text-muted-foreground -mt-2">
-                Tekan tombol di joystick untuk lihat yang mana, lalu assign aksi. Tombol PS2 bersinar saat ditekan.
+                Tekan tombol di joystick untuk lihat yang mana (bersinar saat ditekan), lalu assign aksi.
+              </div>
+
+              {/* D-pad info */}
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-[9px] text-amber-300/80">
+                <span className="font-bold text-amber-300">⚠ D-pad:</span> Beberapa PS2 USB adapter mengirim D-pad sebagai <strong>axes</strong> (bukan buttons), sehingga tidak muncul di daftar ini.
+                Cek tab <strong>🕹️ Axis Mapping</strong> → <em>All Live Axes</em> untuk melihat apakah D-pad muncul di axes 4/5 atau lebih. Kalau muncul di axes, D-pad hanya bisa kontrol gerakan, bukan action.
               </div>
 
               <div className="grid grid-cols-1 gap-1.5">
