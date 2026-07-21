@@ -14,17 +14,10 @@ const DEFAULT_AXIS_MAPPING = {
 };
 
 export type ROVAction =
-  | "none"
-  | "arm_toggle"
-  | "arm"
-  | "disarm"
-  | "light_toggle"
-  | "gripper_toggle"
-  | "gripper_open"
-  | "gripper_close"
-  | "mode_toggle"
-  | "mode_manual"
-  | "mode_depth_hold"
+  | "none" | "arm_toggle" | "arm" | "disarm"
+  | "light_toggle" | "gripper_toggle" | "gripper_open" | "gripper_close"
+  | "mode_toggle" | "mode_manual" | "mode_depth_hold" | "mode_stabilize"
+  | "set_target" | "autonomous_start" | "autonomous_stop"
   | "emergency_stop";
 
 const DEFAULT_BUTTON_MAPPING: Record<number, ROVAction> = {
@@ -328,6 +321,18 @@ function initGlobalGamepadLoop() {
               break;
             case "mode_depth_hold":
               sharedSocket?.emit("cmd_set_mode", { mode: "DEPTH_HOLD" });
+              break;
+            case "mode_stabilize":
+              sharedSocket?.emit("cmd_set_mode", { mode: "STABILIZE" });
+              break;
+            case "set_target":
+              sharedSocket?.emit("cmd_set_target", { target_id: "DOCK_STATION_ALPHA" });
+              break;
+            case "autonomous_start":
+              sharedSocket?.emit("cmd_autonomous_start", { target_id: "AUTONOMOUS_MISSION" });
+              break;
+            case "autonomous_stop":
+              sharedSocket?.emit("cmd_autonomous_stop", { reason: "operator_abort" });
               break;
             case "emergency_stop":
               sharedSocket?.emit("cmd_emergency_stop", { reason: "Operator E-Stop" });

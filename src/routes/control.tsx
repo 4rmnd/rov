@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Power, ToggleLeft, Play, RotateCcw,
   Volume2, VolumeX, ShieldAlert, Gamepad2, Keyboard, Bug, Settings, X, RotateCw, Crosshair,
+  Activity, Radio,
 } from "lucide-react";
 import rovImage from "../assets/rov.png";
 import { useROVSocket } from "../hooks/useROVSocket";
@@ -80,7 +81,9 @@ const DEFAULT_AXIS_MAPPING: GPMapping = {
 export type ROVAction =
   | "none" | "arm_toggle" | "arm" | "disarm"
   | "light_toggle" | "gripper_toggle" | "gripper_open" | "gripper_close"
-  | "mode_toggle" | "mode_manual" | "mode_depth_hold" | "emergency_stop";
+  | "mode_toggle" | "mode_manual" | "mode_depth_hold" | "mode_stabilize"
+  | "set_target" | "autonomous_start" | "autonomous_stop"
+  | "emergency_stop";
 
 export type ButtonMapping = Record<number, ROVAction>;
 
@@ -96,6 +99,10 @@ const ACTION_META: Record<ROVAction, { label: string; color: string }> = {
   mode_toggle: { label: "Mode: Manual ↔ Depth Hold", color: "text-cyan-400" },
   mode_manual: { label: "Set MANUAL mode", color: "text-cyan-400" },
   mode_depth_hold: { label: "Set DEPTH HOLD mode", color: "text-accent" },
+  mode_stabilize: { label: "Set STABILIZE mode", color: "text-blue-400 font-bold" },
+  set_target: { label: "Set Target (Lock Dock Station)", color: "text-purple-400 font-bold" },
+  autonomous_start: { label: "Start Autonomous Mission", color: "text-emerald-400 font-bold" },
+  autonomous_stop: { label: "Stop Autonomous Mission", color: "text-rose-400 font-bold" },
   emergency_stop: { label: "EMERGENCY STOP", color: "text-red-500" },
 };
 
@@ -228,14 +235,14 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
       const a5 = axes[5] ?? 0;
 
       if (a1 < -0.45) btns[20] = true; // Left Stick Up
-      if (a1 > 0.45)  btns[21] = true; // Left Stick Down
+      if (a1 > 0.45) btns[21] = true; // Left Stick Down
       if (a0 < -0.45) btns[22] = true; // Left Stick Left
-      if (a0 > 0.45)  btns[23] = true; // Left Stick Right
+      if (a0 > 0.45) btns[23] = true; // Left Stick Right
 
       if (a2 < -0.45) btns[24] = true; // Right Stick Up
-      if (a2 > 0.45)  btns[25] = true; // Right Stick Down
+      if (a2 > 0.45) btns[25] = true; // Right Stick Down
       if (a5 < -0.45) btns[26] = true; // Right Stick Left
-      if (a5 > 0.45)  btns[27] = true; // Right Stick Right
+      if (a5 > 0.45) btns[27] = true; // Right Stick Right
 
       setLiveAxes(axes);
       setLiveBtns(btns);
@@ -379,11 +386,10 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                         const action = draftBtn[btnIdx] ?? "none";
                         const pressed = liveBtns[btnIdx] ?? false;
                         return (
-                          <div key={btnIdx} className={`p-2 rounded border transition-all duration-75 flex items-center justify-between gap-2 ${
-                            pressed
-                              ? "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400 shadow-md scale-[1.02]"
-                              : "border-panel-border/40 bg-panel/50"
-                          }`}>
+                          <div key={btnIdx} className={`p-2 rounded border transition-all duration-75 flex items-center justify-between gap-2 ${pressed
+                            ? "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400 shadow-md scale-[1.02]"
+                            : "border-panel-border/40 bg-panel/50"
+                            }`}>
                             <span className={`text-[10px] font-bold shrink-0 ${pressed ? "text-emerald-300" : ps2?.color}`}>{ps2?.sym}</span>
                             <select
                               value={action}
@@ -410,11 +416,10 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                         const action = draftBtn[btnIdx] ?? "none";
                         const pressed = liveBtns[btnIdx] ?? false;
                         return (
-                          <div key={btnIdx} className={`p-2 rounded border transition-all duration-75 flex items-center justify-between gap-2 ${
-                            pressed
-                              ? "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400 shadow-md scale-[1.02]"
-                              : "border-panel-border/40 bg-panel/50"
-                          }`}>
+                          <div key={btnIdx} className={`p-2 rounded border transition-all duration-75 flex items-center justify-between gap-2 ${pressed
+                            ? "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400 shadow-md scale-[1.02]"
+                            : "border-panel-border/40 bg-panel/50"
+                            }`}>
                             <span className={`text-[10px] font-bold shrink-0 ${pressed ? "text-emerald-300" : ps2?.color}`}>{ps2?.sym}</span>
                             <select
                               value={action}
@@ -446,15 +451,15 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
 
                   return (
                     <div key={btnIdx} className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all duration-75 ${pressed
-                        ? "border-emerald-400 bg-emerald-500/25 ring-2 ring-emerald-400/80 shadow-[0_0_20px_rgba(16,185,129,0.5)] scale-[1.01]"
-                        : hasAssign
-                          ? "border-violet-500/30 bg-violet-500/5"
-                          : "border-panel-border/40 bg-[oklch(0.16_0.02_250)]"
+                      ? "border-emerald-400 bg-emerald-500/25 ring-2 ring-emerald-400/80 shadow-[0_0_20px_rgba(16,185,129,0.5)] scale-[1.01]"
+                      : hasAssign
+                        ? "border-violet-500/30 bg-violet-500/5"
+                        : "border-panel-border/40 bg-[oklch(0.16_0.02_250)]"
                       }`}>
                       {/* Button symbol badge */}
                       <div className={`w-10 h-10 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all ${pressed
-                          ? "bg-emerald-400 text-slate-950 border-emerald-200 font-extrabold scale-110 shadow-lg"
-                          : `bg-panel border-panel-border ${ps2?.color ?? "text-muted-foreground"}`
+                        ? "bg-emerald-400 text-slate-950 border-emerald-200 font-extrabold scale-110 shadow-lg"
+                        : `bg-panel border-panel-border ${ps2?.color ?? "text-muted-foreground"}`
                         }`}>
                         {ps2?.sym ?? btnIdx}
                       </div>
@@ -685,6 +690,10 @@ function PilotControlsPage() {
       case "mode_toggle": s.sendSetMode(s.telemetry?.mode === "DEPTH_HOLD" ? "MANUAL" : "DEPTH_HOLD"); break;
       case "mode_manual": s.sendSetMode("MANUAL"); break;
       case "mode_depth_hold": s.sendSetMode("DEPTH_HOLD"); break;
+      case "mode_stabilize": s.sendSetMode("STABILIZE"); break;
+      case "set_target": s.sendAutonomousStart("DOCK_STATION_ALPHA"); break;
+      case "autonomous_start": s.sendAutonomousStart("AUTONOMOUS_MISSION"); break;
+      case "autonomous_stop": s.sendAutonomousStop(); break;
       case "emergency_stop": s.sendEmergencyStop(); break;
       default: break;
     }
@@ -913,14 +922,23 @@ function PilotControlsPage() {
           <div className="flex-1 flex flex-col gap-2 py-3 overflow-y-auto">
             {[
               { label: socket.telemetry?.armed ? "THRUSTERS ARMED — CLICK TO DISARM" : "ARM VESSEL MOTORS", fn: toggleArm, active: socket.telemetry?.armed, color: "red", icon: <Power size={16} /> },
-              { label: socket.telemetry?.mode === "DEPTH_HOLD" ? "STABILIZER: DEPTH HOLD" : "CONTROL: MANUAL MODE", fn: toggleMode, active: socket.telemetry?.mode === "DEPTH_HOLD", color: "accent", icon: <ToggleLeft size={16} /> },
+              { label: socket.telemetry?.mode === "DEPTH_HOLD" ? "STABILIZER: DEPTH HOLD" : "SET DEPTH HOLD MODE", fn: () => socket.sendSetMode("DEPTH_HOLD"), active: socket.telemetry?.mode === "DEPTH_HOLD", color: "accent", icon: <ToggleLeft size={16} /> },
+              { label: socket.telemetry?.mode === "STABILIZE" ? "STABILIZER: STABILIZE ACTIVE" : "SET STABILIZE MODE", fn: () => socket.sendSetMode("STABILIZE"), active: socket.telemetry?.mode === "STABILIZE", color: "blue", icon: <Activity size={16} /> },
               { label: lightState ? "LED FLOODLIGHT: ON" : "LED FLOODLIGHT: OFF", fn: toggleLight, active: lightState, color: "yellow", icon: <Play size={16} /> },
               { label: gripperState ? "VESSEL GRIPPER: OPEN" : "VESSEL GRIPPER: CLOSE", fn: toggleGrip, active: gripperState, color: "green", icon: <RotateCcw size={16} /> },
+              { label: socket.autonomousStatus?.is_active ? "AUTONOMOUS MISSION: RUNNING" : "START AUTONOMOUS MISSION", fn: () => socket.autonomousStatus?.is_active ? socket.sendAutonomousStop() : socket.sendAutonomousStart("AUTONOMOUS_MISSION"), active: !!socket.autonomousStatus?.is_active, color: "emerald", icon: <Radio size={16} /> },
+              { label: "LOCK TARGET: DOCK STATION ALPHA", fn: () => socket.sendAutonomousStart("DOCK_STATION_ALPHA"), active: socket.dockAligned, color: "purple", icon: <Crosshair size={16} /> },
             ].map((btn, i) => (
               <button key={i} onClick={btn.fn}
-                className={`flex items-center justify-center gap-2.5 py-3 rounded-lg border font-bold text-sm cursor-pointer transition-colors shrink-0 ${btn.active
-                    ? btn.color === "accent" ? "bg-accent/20 text-accent border-accent/30" : btn.color === "yellow" ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30" : btn.color === "green" ? "bg-green-500/20 text-green-500 border-green-500/30" : "bg-red-500/20 text-red-400 border-red-500/30"
-                    : "bg-panel border-panel-border text-muted-foreground hover:text-foreground hover:bg-panel/60"
+                className={`flex items-center justify-center gap-2.5 py-2.5 rounded-lg border font-bold text-xs cursor-pointer transition-colors shrink-0 ${btn.active
+                  ? btn.color === "accent" ? "bg-accent/20 text-accent border-accent/30"
+                    : btn.color === "blue" ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                      : btn.color === "yellow" ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30"
+                        : btn.color === "green" ? "bg-green-500/20 text-green-500 border-green-500/30"
+                          : btn.color === "emerald" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 animate-pulse"
+                            : btn.color === "purple" ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
+                              : "bg-red-500/20 text-red-400 border-red-500/30"
+                  : "bg-panel border-panel-border text-muted-foreground hover:text-foreground hover:bg-panel/60"
                   }`}>
                 {btn.icon}<span>{btn.label}</span>
               </button>
