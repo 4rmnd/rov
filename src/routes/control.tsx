@@ -884,35 +884,48 @@ function PilotControlsPage() {
 
         {/* Col 1: Attitude */}
         <div className="panel flex flex-col flex-1 min-h-[380px] lg:h-full p-3 justify-between">
-          <div className="border-b border-panel-border/60 pb-2 shrink-0"><span className="label-caps">Attitude Flight Instrument</span></div>
+          <div className="border-b border-panel-border/60 pb-2 shrink-0 flex items-center justify-between">
+            <span className="label-caps font-bold">Attitude Flight Instrument</span>
+            <span className="text-[9px] font-mono text-cyan-400 font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">AHRS HUD</span>
+          </div>
+
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2.5 py-2.5 min-h-0">
             <div className="flex flex-col gap-1.5 min-h-0">
-              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Attitude Indicator</span>
-              <div className="flex-1 min-h-[130px] bg-[oklch(0.14_0.028_250)] rounded-lg border border-panel-border grid place-items-center relative">
-                <img src={rovImage} alt="ROV" className="w-full h-full object-contain p-3"
+              <span className="text-[9px] text-cyan-300 font-semibold uppercase tracking-wide">Attitude Indicator</span>
+              <div className="flex-1 min-h-[140px] bg-gradient-to-b from-[oklch(0.13_0.028_250)] to-[oklch(0.10_0.02_250)] rounded-xl border border-cyan-500/30 overflow-hidden grid place-items-center relative shadow-[inset_0_0_20px_rgba(6,182,212,0.08)]">
+                <img src={rovImage} alt="ROV" className="w-full h-full object-contain p-3 drop-shadow-[0_0_12px_rgba(6,182,212,0.25)]"
                   style={{ transform: `rotate(${roll}deg) scale(${Math.max(0.65, 1 - Math.abs(pitch) / 180)})`, transition: "transform 0.1s ease-out" }} />
-                <div className="absolute bottom-1.5 left-2 font-mono text-[10px] text-muted-foreground">R:{roll.toFixed(1)}° P:{pitch.toFixed(1)}°</div>
+                <div className="absolute bottom-2 left-2 text-[10px] font-mono font-bold text-cyan-300 bg-slate-950/80 px-2 py-0.5 rounded-md border border-cyan-500/30 backdrop-blur-md">
+                  R: {roll.toFixed(1)}° P: {pitch.toFixed(1)}°
+                </div>
               </div>
             </div>
+
             <div className="flex flex-col gap-1.5 min-h-0">
-              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Compass (Yaw)</span>
-              <div className="flex-1 min-h-[130px] bg-[oklch(0.14_0.028_250)] rounded-lg border border-panel-border grid place-items-center relative">
+              <span className="text-[9px] text-cyan-300 font-semibold uppercase tracking-wide">Compass (Yaw)</span>
+              <div className="flex-1 min-h-[140px] bg-gradient-to-b from-[oklch(0.13_0.028_250)] to-[oklch(0.10_0.02_250)] rounded-xl border border-cyan-500/30 overflow-hidden grid place-items-center relative shadow-[inset_0_0_20px_rgba(6,182,212,0.08)]">
                 <svg viewBox="0 0 100 100" className="w-full h-full p-2.5">
                   <g transform={`rotate(${yaw},50,50)`} style={{ transition: "transform 0.1s ease-out" }}>
-                    <circle cx="50" cy="50" r="30" fill="none" stroke="var(--color-panel-border)" strokeWidth="1.5" />
-                    <polygon points="50,15 45,25 55,25" fill="var(--color-data)" />
-                    <text x="50" y="35" fontSize="8" fill="var(--color-data)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">N</text>
-                    <line x1="50" y1="25" x2="50" y2="75" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2" />
-                    <line x1="25" y1="50" x2="75" y2="50" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2" />
+                    <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(6, 182, 212, 0.4)" strokeWidth="1.5" />
+                    <polygon points="50,15 45,25 55,25" fill="#06b6d4" className="drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]" />
+                    <text x="50" y="35" fontSize="8" fill="#06b6d4" textAnchor="middle" fontFamily="monospace" fontWeight="extrabold">N</text>
+                    <line x1="50" y1="25" x2="50" y2="75" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="2 2" />
+                    <line x1="25" y1="50" x2="75" y2="50" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="2 2" />
                   </g>
-                  <circle cx="50" cy="50" r="3" fill="#fff" />
+                  <circle cx="50" cy="50" r="3" fill="#06b6d4" />
                 </svg>
-                <div className="absolute bottom-1.5 right-2 font-mono text-[10px] text-muted-foreground">HDG:{yaw.toFixed(1)}°</div>
+                <div className="absolute bottom-2 right-2 text-[10px] font-mono font-bold text-cyan-300 bg-slate-950/80 px-2 py-0.5 rounded-md border border-cyan-500/30 backdrop-blur-md">
+                  HDG: {yaw.toFixed(1)}°
+                </div>
               </div>
             </div>
           </div>
+
           <div className="border-t border-panel-border/40 pt-2 shrink-0">
-            <div className="text-[10px] text-muted-foreground font-semibold text-center">Internal Gyroscopic AHRS Calibration: OK</div>
+            <div className="text-[10px] text-cyan-400/90 font-mono font-semibold text-center flex items-center justify-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              Internal Gyroscopic AHRS Calibration: OK
+            </div>
           </div>
         </div>
 

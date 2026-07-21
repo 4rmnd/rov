@@ -522,42 +522,84 @@ function TrajectoryCard({ trajectory }: { trajectory: any }) {
           RESET ORIGIN
         </button>
       </div>
-      <div className="relative flex-1 min-h-0 bg-[oklch(0.15_0.03_250)] rounded-lg border border-panel-border overflow-hidden">
+      <div className="relative flex-1 min-h-0 bg-gradient-to-b from-[oklch(0.12_0.03_250)] via-[oklch(0.14_0.032_250)] to-[oklch(0.10_0.025_250)] rounded-xl border border-cyan-500/30 overflow-hidden shadow-[inset_0_0_25px_rgba(6,182,212,0.08)]">
         {/* Background Grid */}
         <svg className="absolute inset-0 w-full h-full">
           <defs>
             <pattern id="grid" width="40" height="20" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 20" fill="none" stroke="oklch(0.28 0.03 250)" strokeWidth="0.5" />
+              <path d="M 40 0 L 0 0 0 20" fill="none" stroke="rgba(6, 182, 212, 0.12)" strokeWidth="0.5" />
             </pattern>
+            <linearGradient id="traj-path-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#06b6d4" />
+              <stop offset="100%" stopColor="#10b981" />
+            </linearGradient>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
         </svg>
 
+        {/* Tactical Badge Top-Right */}
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-950/80 backdrop-blur-md border border-cyan-500/30 rounded-md px-2 py-1 font-mono text-[9px]">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+          <span className="text-cyan-300 font-bold">RADAR TRACK</span>
+        </div>
+
         {/* Path Overlay */}
         <svg viewBox="0 0 300 160" className="relative w-full h-full z-10 p-2">
-          {/* Origin Marker */}
-          <circle cx={originX} cy={originY} r="3.5" fill="#fff" opacity="0.4" />
+          {/* Concentric Range Rings */}
+          {[30, 60, 90].map((r) => (
+            <circle
+              key={r}
+              cx={originX}
+              cy={originY}
+              r={r}
+              fill="none"
+              stroke="rgba(6, 182, 212, 0.15)"
+              strokeWidth="1"
+              strokeDasharray="3 3"
+            />
+          ))}
+
+          {/* Crosshair Center Lines */}
+          <line x1={originX} y1="10" x2={originX} y2="150" stroke="rgba(6, 182, 212, 0.2)" strokeWidth="1" strokeDasharray="2 2" />
+          <line x1="20" y1={originY} x2="280" y2={originY} stroke="rgba(6, 182, 212, 0.2)" strokeWidth="1" strokeDasharray="2 2" />
+
+          {/* Center Origin Marker */}
+          <circle cx={originX} cy={originY} r="3.5" fill="#06b6d4" opacity="0.8" />
+          <circle cx={originX} cy={originY} r="7" fill="none" stroke="#06b6d4" strokeWidth="1" opacity="0.4" />
 
           {pathD && (
             <path
               d={pathD}
               fill="none"
-              stroke="var(--color-data)"
-              strokeWidth="2.5"
+              stroke="url(#traj-path-gradient)"
+              strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className="drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]"
             />
           )}
 
-          {/* Current ROV Position Dot */}
+          {/* Current ROV Position Marker */}
           {points.length > 0 && (
-            <circle
-              cx={originX + currentX * scale}
-              cy={originY - currentY * scale}
-              r="5.5"
-              fill="var(--color-success)"
-              className="animate-pulse"
-            />
+            <g>
+              <circle
+                cx={originX + currentX * scale}
+                cy={originY - currentY * scale}
+                r="10"
+                fill="rgba(16, 185, 129, 0.25)"
+                stroke="#10b981"
+                strokeWidth="1.5"
+                className="animate-ping"
+              />
+              <circle
+                cx={originX + currentX * scale}
+                cy={originY - currentY * scale}
+                r="6"
+                fill="#020617"
+                stroke="#10b981"
+                strokeWidth="2"
+              />
+            </g>
           )}
         </svg>
       </div>
@@ -790,18 +832,18 @@ function ROVDesignPanel({ orientation }: { orientation: any }) {
 
         {/* Left: ROV Image */}
         <div className="flex flex-col gap-1">
-          <div className="text-[9px] tracking-wide text-muted-foreground font-semibold uppercase">Attitude Indicator</div>
-          <div className="aspect-square bg-[oklch(0.14_0.028_250)] rounded-lg border border-panel-border overflow-hidden grid place-items-center relative">
+          <div className="text-[9px] tracking-wide text-cyan-300 font-semibold uppercase">Attitude Indicator</div>
+          <div className="aspect-square bg-gradient-to-b from-[oklch(0.13_0.028_250)] to-[oklch(0.10_0.02_250)] rounded-xl border border-cyan-500/30 overflow-hidden grid place-items-center relative shadow-[inset_0_0_15px_rgba(6,182,212,0.06)]">
             <img
               src={rovImage}
               alt="ROV 3D Model"
-              className="w-full h-full object-contain p-2"
+              className="w-full h-full object-contain p-2 drop-shadow-[0_0_10px_rgba(6,182,212,0.2)]"
               style={{
                 transform: `rotate(${roll}deg) scale(${Math.max(0.6, 1 - Math.abs(pitch) / 180)})`,
                 transition: "transform 0.1s ease-out",
               }}
             />
-            <div className="absolute bottom-1.5 left-2 text-[10px] font-mono text-muted-foreground">
+            <div className="absolute bottom-1.5 left-2 text-[10px] font-mono font-bold text-cyan-300 bg-slate-950/70 px-1.5 py-0.5 rounded border border-cyan-500/20">
               R: {roll.toFixed(1)}° P: {pitch.toFixed(1)}°
             </div>
           </div>
@@ -809,25 +851,25 @@ function ROVDesignPanel({ orientation }: { orientation: any }) {
 
         {/* Right: Axis Indicator */}
         <div className="flex flex-col gap-1">
-          <div className="text-[9px] tracking-wide text-muted-foreground font-semibold uppercase">Compass (Yaw)</div>
-          <div className="aspect-square bg-[oklch(0.14_0.028_250)] rounded-lg border border-panel-border overflow-hidden grid place-items-center relative">
+          <div className="text-[9px] tracking-wide text-cyan-300 font-semibold uppercase">Compass (Yaw)</div>
+          <div className="aspect-square bg-gradient-to-b from-[oklch(0.13_0.028_250)] to-[oklch(0.10_0.02_250)] rounded-xl border border-cyan-500/30 overflow-hidden grid place-items-center relative shadow-[inset_0_0_15px_rgba(6,182,212,0.06)]">
             <svg viewBox="0 0 100 100" className="w-full h-full p-2">
               <g transform={`rotate(${yaw}, 50, 50)`} style={{ transition: "transform 0.1s ease-out" }}>
                 {/* Compass Circle */}
-                <circle cx="50" cy="50" r="30" fill="none" stroke="var(--color-panel-border)" strokeWidth="1.5" />
+                <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(6, 182, 212, 0.4)" strokeWidth="1.5" />
 
                 {/* Pointer / North Indicator */}
-                <polygon points="50,15 45,25 55,25" fill="var(--color-data)" />
-                <text x="50" y="35" fontSize="8" stroke="none" fill="var(--color-data)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">N</text>
+                <polygon points="50,15 45,25 55,25" fill="#06b6d4" className="drop-shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+                <text x="50" y="35" fontSize="8" stroke="none" fill="#06b6d4" textAnchor="middle" fontFamily="monospace" fontWeight="extrabold">N</text>
 
                 {/* Axis lines */}
-                <line x1="50" y1="25" x2="50" y2="75" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2" />
-                <line x1="25" y1="50" x2="75" y2="50" stroke="var(--color-panel-border)" strokeWidth="1" strokeDasharray="2 2" />
+                <line x1="50" y1="25" x2="50" y2="75" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="2 2" />
+                <line x1="25" y1="50" x2="75" y2="50" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="2 2" />
               </g>
               {/* Center point */}
-              <circle cx="50" cy="50" r="3" fill="#fff" />
+              <circle cx="50" cy="50" r="3" fill="#06b6d4" />
             </svg>
-            <div className="absolute bottom-1.5 right-2 text-[10px] font-mono text-muted-foreground">
+            <div className="absolute bottom-1.5 right-2 text-[10px] font-mono font-bold text-cyan-300 bg-slate-950/70 px-1.5 py-0.5 rounded border border-cyan-500/20">
               HDG: {yaw.toFixed(1)}°
             </div>
           </div>
