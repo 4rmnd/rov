@@ -229,34 +229,36 @@ function initGlobalGamepadLoop() {
     const am = loadLS(LS_AXIS, DEFAULT_AXIS_MAPPING);
     const bm = loadLS<Record<number, ROVAction>>(LS_BTN, DEFAULT_BUTTON_MAPPING);
 
-    // 1. Calculate Stick Movement PWM Channels
+    // 1. Calculate Stick Movement PWM Channels (Supporting both 4-ch and ArduSub 6-ch layouts)
     const ch: Record<number, number> = {
-      1: axisPWM(gp.axes[am.lateral.axisIdx] ?? 0, am.lateral.invert),
-      2: axisPWM(gp.axes[am.forward.axisIdx] ?? 0, am.forward.invert),
-      3: axisPWM(gp.axes[am.throttle.axisIdx] ?? 0, am.throttle.invert),
-      4: axisPWM(gp.axes[am.yaw.axisIdx] ?? 0, am.yaw.invert),
+      1: axisPWM(gp.axes[am.lateral.axisIdx] ?? 0, am.lateral.invert),   // Lateral (Legacy Ch 1)
+      2: axisPWM(gp.axes[am.forward.axisIdx] ?? 0, am.forward.invert),   // Forward (Legacy Ch 2)
+      3: axisPWM(gp.axes[am.throttle.axisIdx] ?? 0, am.throttle.invert),  // Throttle (Ch 3 Vertical)
+      4: axisPWM(gp.axes[am.yaw.axisIdx] ?? 0, am.yaw.invert),           // Yaw (Ch 4 Turning)
+      5: axisPWM(gp.axes[am.forward.axisIdx] ?? 0, am.forward.invert),   // Forward (ArduSub Standard Ch 5)
+      6: axisPWM(gp.axes[am.lateral.axisIdx] ?? 0, am.lateral.invert),   // Lateral (ArduSub Standard Ch 6)
     };
 
     // 2. D-Pad Movement Support via Axis #9 (POV Hat)
     const povParsed = parsePOVHat(gp.axes[9] ?? gp.axes[4] ?? 0);
 
-    if (ch[2] === 1500) {
-      if (povParsed.up) ch[2] = 1800;
-      else if (povParsed.down) ch[2] = 1200;
+    if (ch[5] === 1500 && ch[2] === 1500) {
+      if (povParsed.up) { ch[2] = 1800; ch[5] = 1800; }
+      else if (povParsed.down) { ch[2] = 1200; ch[5] = 1200; }
     }
-    if (ch[1] === 1500) {
-      if (povParsed.left) ch[1] = 1200;
-      else if (povParsed.right) ch[1] = 1800;
+    if (ch[6] === 1500 && ch[1] === 1500) {
+      if (povParsed.left) { ch[1] = 1200; ch[6] = 1200; }
+      else if (povParsed.right) { ch[1] = 1800; ch[6] = 1800; }
     }
 
     // 3. Fallback D-Pad Buttons 12-15 Movement
-    if (ch[2] === 1500) {
-      if (gp.buttons[12]?.pressed && (!bm[12] || bm[12] === "none")) ch[2] = 1800;
-      else if (gp.buttons[13]?.pressed && (!bm[13] || bm[13] === "none")) ch[2] = 1200;
+    if (ch[5] === 1500 && ch[2] === 1500) {
+      if (gp.buttons[12]?.pressed && (!bm[12] || bm[12] === "none")) { ch[2] = 1800; ch[5] = 1800; }
+      else if (gp.buttons[13]?.pressed && (!bm[13] || bm[13] === "none")) { ch[2] = 1200; ch[5] = 1200; }
     }
-    if (ch[1] === 1500) {
-      if (gp.buttons[15]?.pressed && (!bm[15] || bm[15] === "none")) ch[1] = 1800;
-      else if (gp.buttons[14]?.pressed && (!bm[14] || bm[14] === "none")) ch[1] = 1200;
+    if (ch[6] === 1500 && ch[1] === 1500) {
+      if (gp.buttons[15]?.pressed && (!bm[15] || bm[15] === "none")) { ch[1] = 1800; ch[6] = 1800; }
+      else if (gp.buttons[14]?.pressed && (!bm[14] || bm[14] === "none")) { ch[1] = 1200; ch[6] = 1200; }
     }
 
     // 4. Button Press Detection (Rising Edge Only)
