@@ -71,10 +71,10 @@ export type AxisMap = { axisIdx: number; invert: boolean };
 export type GPMapping = { lateral: AxisMap; forward: AxisMap; throttle: AxisMap; yaw: AxisMap };
 
 const DEFAULT_AXIS_MAPPING: GPMapping = {
-  lateral: { axisIdx: 0, invert: false }, // Left Stick X  (x360ce Axis 1)
-  forward: { axisIdx: 1, invert: true }, // Left Stick Y  (x360ce IAxis 2)
-  throttle: { axisIdx: 2, invert: true }, // Right Stick Y (x360ce IAxis 3)
-  yaw: { axisIdx: 5, invert: false }, // Right Stick X (x360ce Axis 6 -> 0-index Axis 5)
+  yaw: { axisIdx: 0, invert: false },      // Left Stick X  (Belok Kanan / Kiri)
+  forward: { axisIdx: 1, invert: true },   // Left Stick Y  (Maju / Mundur)
+  throttle: { axisIdx: 2, invert: true },  // Right Stick Y (Naik / Turun)
+  lateral: { axisIdx: 5, invert: false },  // Right Stick X (Geser Kiri / Kanan)
 };
 
 // ── Button Mapping ────────────────────────────────────────────────────────────
@@ -153,7 +153,7 @@ const DEFAULT_BUTTON_MAPPING: ButtonMapping = {
 };
 
 // ── LocalStorage ──────────────────────────────────────────────────────────────
-const LS_AXIS = "rov_axis_mapping_v1";
+const LS_AXIS = "rov_axis_mapping_v2";
 const LS_BTN = "rov_btn_mapping_v1";
 function loadLS<T>(key: string, fallback: T): T {
   try { const r = localStorage.getItem(key); return r ? { ...fallback, ...JSON.parse(r) } : fallback; } catch { return fallback; }

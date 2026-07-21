@@ -3,14 +3,14 @@ import { io, Socket } from "socket.io-client";
 
 const ROV_URL = import.meta.env.VITE_ROV_URL ?? "http://localhost:8000";
 
-const LS_AXIS = "rov_axis_mapping_v1";
+const LS_AXIS = "rov_axis_mapping_v2";
 const LS_BTN = "rov_btn_mapping_v1";
 
 const DEFAULT_AXIS_MAPPING = {
-  lateral: { axisIdx: 0, invert: false }, // Left Stick X
-  forward: { axisIdx: 1, invert: true }, // Left Stick Y
-  throttle: { axisIdx: 2, invert: true }, // Right Stick Y
-  yaw: { axisIdx: 5, invert: false }, // Right Stick X
+  yaw: { axisIdx: 0, invert: false },      // Left Stick X (Belok Kanan / Kiri)
+  forward: { axisIdx: 1, invert: true },   // Left Stick Y (Maju / Mundur)
+  throttle: { axisIdx: 2, invert: true },  // Right Stick Y (Naik / Turun)
+  lateral: { axisIdx: 5, invert: false },  // Right Stick X (Geser Kiri / Kanan)
 };
 
 export type ROVAction =
