@@ -4,29 +4,38 @@ import { io, Socket } from "socket.io-client";
 const ROV_URL = import.meta.env.VITE_ROV_URL ?? "http://localhost:8000";
 
 const LS_AXIS = "rov_axis_mapping_v1";
-const LS_BTN  = "rov_btn_mapping_v1";
+const LS_BTN = "rov_btn_mapping_v1";
 
 const DEFAULT_AXIS_MAPPING = {
-  lateral:  { axisIdx: 0, invert: false }, // Left Stick X
-  forward:  { axisIdx: 1, invert: true  }, // Left Stick Y
-  throttle: { axisIdx: 2, invert: true  }, // Right Stick Y
-  yaw:      { axisIdx: 5, invert: false }, // Right Stick X
+  lateral: { axisIdx: 0, invert: false }, // Left Stick X
+  forward: { axisIdx: 1, invert: true }, // Left Stick Y
+  throttle: { axisIdx: 2, invert: true }, // Right Stick Y
+  yaw: { axisIdx: 5, invert: false }, // Right Stick X
 };
 
 export type ROVAction =
-  | "none" | "arm_toggle" | "arm" | "disarm"
-  | "light_toggle" | "gripper_toggle" | "gripper_open" | "gripper_close"
-  | "mode_toggle" | "mode_manual" | "mode_depth_hold" | "emergency_stop";
+  | "none"
+  | "arm_toggle"
+  | "arm"
+  | "disarm"
+  | "light_toggle"
+  | "gripper_toggle"
+  | "gripper_open"
+  | "gripper_close"
+  | "mode_toggle"
+  | "mode_manual"
+  | "mode_depth_hold"
+  | "emergency_stop";
 
 const DEFAULT_BUTTON_MAPPING: Record<number, ROVAction> = {
-  0: "mode_toggle",    // Triangle △
+  0: "mode_toggle", // Triangle △
   1: "gripper_toggle", // Circle ○
-  2: "arm_toggle",     // Cross ×
-  3: "light_toggle",   // Square □
+  2: "arm_toggle", // Cross ×
+  3: "light_toggle", // Square □
   9: "emergency_stop", // Start
 };
 
-const DEADZONE  = 0.10;
+const DEADZONE = 0.1;
 const PWM_RANGE = 400;
 
 function applyDZ(v: number) {
@@ -42,19 +51,19 @@ function parsePOVHat(pov: number) {
   if (pov === 0 || pov > 1.05 || (pov > 0.82 && pov < 0.98)) {
     return { up: false, down: false, left: false, right: false };
   }
-  const isUp    = (pov <= -0.85) || (pov >= 0.85 && pov <= 1.05);
-  const isDown  = (pov >= 0.02 && pov <= 0.28);
-  const isRight = (pov >= -0.58 && pov <= -0.28);
-  const isLeft  = (pov >= 0.58 && pov <= 0.82);
+  const isUp = pov <= -0.85 || (pov >= 0.85 && pov <= 1.05);
+  const isDown = pov >= 0.02 && pov <= 0.28;
+  const isRight = pov >= -0.58 && pov <= -0.28;
+  const isLeft = pov >= 0.58 && pov <= 0.82;
 
-  const isUpRight   = (pov >= -0.84 && pov <= -0.59);
-  const isDownRight = (pov >= -0.27 && pov <= -0.01);
-  const isDownLeft  = (pov >= 0.29 && pov <= 0.57);
+  const isUpRight = pov >= -0.84 && pov <= -0.59;
+  const isDownRight = pov >= -0.27 && pov <= -0.01;
+  const isDownLeft = pov >= 0.29 && pov <= 0.57;
 
   return {
-    up:    isUp || isUpRight,
-    down:  isDown || isDownRight || isDownLeft,
-    left:  isLeft || isDownLeft,
+    up: isUp || isUpRight,
+    down: isDown || isDownRight || isDownLeft,
+    left: isLeft || isDownLeft,
     right: isRight || isUpRight || isDownRight,
   };
 }
@@ -180,7 +189,7 @@ let sharedState: ROVSocketState = {
 const listeners = new Set<(s: ROVSocketState) => void>();
 
 function notifyListeners() {
-  listeners.forEach(fn => fn({ ...sharedState }));
+  listeners.forEach((fn) => fn({ ...sharedState }));
 }
 
 let gamepadLoopStarted = false;
@@ -209,7 +218,10 @@ function initGlobalGamepadLoop() {
     const pads = typeof navigator !== "undefined" ? (navigator.getGamepads?.() ?? []) : [];
     if (gpIdx === null || !pads[gpIdx]) {
       for (let i = 0; i < pads.length; i++) {
-        if (pads[i]) { gpIdx = i; break; }
+        if (pads[i]) {
+          gpIdx = i;
+          break;
+        }
       }
     }
 
@@ -222,10 +234,10 @@ function initGlobalGamepadLoop() {
 
     // 1. Calculate Stick Movement PWM Channels
     const ch: Record<number, number> = {
-      1: axisPWM(gp.axes[am.lateral.axisIdx]  ?? 0, am.lateral.invert),
-      2: axisPWM(gp.axes[am.forward.axisIdx]  ?? 0, am.forward.invert),
+      1: axisPWM(gp.axes[am.lateral.axisIdx] ?? 0, am.lateral.invert),
+      2: axisPWM(gp.axes[am.forward.axisIdx] ?? 0, am.forward.invert),
       3: axisPWM(gp.axes[am.throttle.axisIdx] ?? 0, am.throttle.invert),
-      4: axisPWM(gp.axes[am.yaw.axisIdx]      ?? 0, am.yaw.invert),
+      4: axisPWM(gp.axes[am.yaw.axisIdx] ?? 0, am.yaw.invert),
     };
 
     // 2. D-Pad Movement Support via Axis #9 (POV Hat)
@@ -251,10 +263,12 @@ function initGlobalGamepadLoop() {
     }
 
     // 4. Button Press Detection (Rising Edge Only)
-    const btns = Array.from(gp.buttons).map(b => b.pressed || (typeof b === "object" && b.value > 0.5));
-    if (povParsed.up)    btns[12] = true;
-    if (povParsed.down)  btns[13] = true;
-    if (povParsed.left)  btns[14] = true;
+    const btns = Array.from(gp.buttons).map(
+      (b) => b.pressed || (typeof b === "object" && b.value > 0.5),
+    );
+    if (povParsed.up) btns[12] = true;
+    if (povParsed.down) btns[13] = true;
+    if (povParsed.left) btns[14] = true;
     if (povParsed.right) btns[15] = true;
 
     const a0 = gp.axes[0] ?? 0;
@@ -263,14 +277,14 @@ function initGlobalGamepadLoop() {
     const a5 = gp.axes[5] ?? 0;
 
     if (a1 < -0.45) btns[20] = true;
-    if (a1 > 0.45)  btns[21] = true;
+    if (a1 > 0.45) btns[21] = true;
     if (a0 < -0.45) btns[22] = true;
-    if (a0 > 0.45)  btns[23] = true;
+    if (a0 > 0.45) btns[23] = true;
 
     if (a2 < -0.45) btns[24] = true;
-    if (a2 > 0.45)  btns[25] = true;
+    if (a2 > 0.45) btns[25] = true;
     if (a5 < -0.45) btns[26] = true;
-    if (a5 > 0.45)  btns[27] = true;
+    if (a5 > 0.45) btns[27] = true;
 
     btns.forEach((pressed, i) => {
       if (pressed && !(prevBtns[i] ?? false)) {
@@ -278,7 +292,9 @@ function initGlobalGamepadLoop() {
         if (action && action !== "none") {
           switch (action) {
             case "arm_toggle":
-              sharedState.telemetry?.armed ? sharedSocket?.emit("cmd_disarm") : sharedSocket?.emit("cmd_arm");
+              sharedState.telemetry?.armed
+                ? sharedSocket?.emit("cmd_disarm")
+                : sharedSocket?.emit("cmd_arm");
               break;
             case "arm":
               sharedSocket?.emit("cmd_arm");
@@ -303,7 +319,9 @@ function initGlobalGamepadLoop() {
               sharedSocket?.emit("cmd_gripper", { action: "close" });
               break;
             case "mode_toggle":
-              sharedSocket?.emit("cmd_set_mode", { mode: sharedState.telemetry?.mode === "DEPTH_HOLD" ? "MANUAL" : "DEPTH_HOLD" });
+              sharedSocket?.emit("cmd_set_mode", {
+                mode: sharedState.telemetry?.mode === "DEPTH_HOLD" ? "MANUAL" : "DEPTH_HOLD",
+              });
               break;
             case "mode_manual":
               sharedSocket?.emit("cmd_set_mode", { mode: "MANUAL" });
@@ -440,16 +458,20 @@ export function useROVSocket() {
     };
   }, []);
 
-  const sendEmergencyStop = () => sharedSocket?.emit("cmd_emergency_stop", { reason: "Operator E-Stop" });
+  const sendEmergencyStop = () =>
+    sharedSocket?.emit("cmd_emergency_stop", { reason: "Operator E-Stop" });
   const sendClearEmergency = () => sharedSocket?.emit("cmd_clear_emergency");
   const sendArm = () => sharedSocket?.emit("cmd_arm");
   const sendDisarm = () => sharedSocket?.emit("cmd_disarm");
   const sendSetMode = (mode: string) => sharedSocket?.emit("cmd_set_mode", { mode });
   const sendGripper = (action: "open" | "close") => sharedSocket?.emit("cmd_gripper", { action });
   const sendLight = (state: boolean) => sharedSocket?.emit("cmd_light", { state });
-  const sendAutonomousStart = (targetId: string) => sharedSocket?.emit("cmd_autonomous_start", { target_id: targetId });
-  const sendAutonomousStop = () => sharedSocket?.emit("cmd_autonomous_stop", { reason: "operator_abort" });
-  const sendRCOverride = (channels: Record<number, number>) => sharedSocket?.emit("cmd_rc_override", { channels });
+  const sendAutonomousStart = (targetId: string) =>
+    sharedSocket?.emit("cmd_autonomous_start", { target_id: targetId });
+  const sendAutonomousStop = () =>
+    sharedSocket?.emit("cmd_autonomous_stop", { reason: "operator_abort" });
+  const sendRCOverride = (channels: Record<number, number>) =>
+    sharedSocket?.emit("cmd_rc_override", { channels });
 
   return {
     ...state,
