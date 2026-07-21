@@ -3,14 +3,22 @@ import { io, Socket } from "socket.io-client";
 
 const ROV_URL = import.meta.env.VITE_ROV_URL ?? "http://localhost:8000";
 
-const LS_AXIS = "rov_axis_mapping_v2";
-const LS_BTN = "rov_btn_mapping_v1";
+const LS_AXIS = "rov_axis_mapping_v6";
+const LS_BTN = "rov_btn_mapping_v2";
+
+// Aggressively clear ALL legacy cached axis mappings
+try {
+  if (typeof localStorage !== "undefined") {
+    ["v1", "v2", "v3", "v4", "v5"].forEach(v => localStorage.removeItem(`rov_axis_mapping_${v}`));
+  }
+} catch (e) { /* ignore */ }
 
 const DEFAULT_AXIS_MAPPING = {
-  yaw: { axisIdx: 0, invert: false },      // Left Stick X (Belok Kanan / Kiri)
-  forward: { axisIdx: 1, invert: true },   // Left Stick Y (Maju / Mundur)
-  throttle: { axisIdx: 2, invert: true },  // Right Stick Y (Naik / Turun)
-  lateral: { axisIdx: 5, invert: false },  // Right Stick X (Geser Kiri / Kanan)
+  // Gamepad API Standard: Axis 0=LS_X, Axis 1=LS_Y, Axis 2=RS_X, Axis 3=RS_Y
+  forward: { axisIdx: 1, invert: true },   // Left Stick Y  (Up = Maju, Down = Mundur)
+  yaw:     { axisIdx: 0, invert: false },  // Left Stick X  (Right = Belok Kanan, Left = Belok Kiri)
+  throttle:{ axisIdx: 3, invert: true },  // Right Stick Y (Up = Naik, Down = Turun)
+  lateral: { axisIdx: 2, invert: false },  // Right Stick X (Right = Geser Kanan, Left = Geser Kiri)
 };
 
 export type ROVAction =
