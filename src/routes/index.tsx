@@ -199,6 +199,8 @@ function Dashboard() {
             <QuickControls
               armed={!!socket.telemetry?.armed}
               mode={socket.telemetry?.mode ?? "MANUAL"}
+              lightState={socket.lightState}
+              gripperState={socket.gripperState}
               sendArm={socket.sendArm}
               sendDisarm={socket.sendDisarm}
               sendSetMode={socket.sendSetMode}
@@ -587,6 +589,8 @@ function MiniStat({ label, value, tone }: { label: string; value: string; tone?:
 function QuickControls({
   armed,
   mode,
+  lightState,
+  gripperState,
   sendArm,
   sendDisarm,
   sendSetMode,
@@ -595,15 +599,14 @@ function QuickControls({
 }: {
   armed: boolean;
   mode: string;
+  lightState: boolean;
+  gripperState: boolean;
   sendArm: () => void;
   sendDisarm: () => void;
   sendSetMode: (mode: string) => void;
   sendGripper: (action: "open" | "close") => void;
   sendLight: (state: boolean) => void;
 }) {
-  const [lightState, setLightState] = useState(false);
-  const [gripperState, setGripperState] = useState(false);
-
   const handleToggleArm = () => {
     if (armed) {
       sendDisarm();
@@ -615,21 +618,19 @@ function QuickControls({
   const handleToggleMode = () => {
     if (mode === "DEPTH_HOLD") {
       sendSetMode("MANUAL");
+    } else if (mode === "MANUAL") {
+      sendSetMode("STABILIZE");
     } else {
       sendSetMode("DEPTH_HOLD");
     }
   };
 
   const handleToggleLight = () => {
-    const nextState = !lightState;
-    setLightState(nextState);
-    sendLight(nextState);
+    sendLight(!lightState);
   };
 
   const handleToggleGripper = () => {
-    const nextState = !gripperState;
-    setGripperState(nextState);
-    sendGripper(nextState ? "open" : "close");
+    sendGripper(gripperState ? "close" : "open");
   };
 
   return (

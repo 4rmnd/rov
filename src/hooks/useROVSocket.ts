@@ -162,6 +162,8 @@ export interface ROVSocketState {
   lastCameraResult: CameraResult | null;
   autonomousStatus: AutonomousStatus | null;
   failsafeStatus: FailsafeStatus | null;
+  lightState: boolean;
+  gripperState: boolean;
 }
 
 // ─── SINGLETON INSTANCE & STATE MANAGEMENT ─────────────────────────────────────
@@ -177,6 +179,8 @@ let sharedState: ROVSocketState = {
   lastCameraResult: null,
   autonomousStatus: null,
   failsafeStatus: null,
+  lightState: false,
+  gripperState: false,
 };
 
 const listeners = new Set<(s: ROVSocketState) => void>();
@@ -296,19 +300,23 @@ function initGlobalGamepadLoop() {
               sharedSocket?.emit("cmd_disarm");
               break;
             case "light_toggle":
-              lightState = !lightState;
-              sharedSocket?.emit("cmd_light", { state: lightState });
+              sharedState.lightState = !sharedState.lightState;
+              notifyListeners();
+              sharedSocket?.emit("cmd_light", { state: sharedState.lightState });
               break;
             case "gripper_toggle":
-              gripperState = !gripperState;
-              sharedSocket?.emit("cmd_gripper", { action: gripperState ? "open" : "close" });
+              sharedState.gripperState = !sharedState.gripperState;
+              notifyListeners();
+              sharedSocket?.emit("cmd_gripper", { action: sharedState.gripperState ? "open" : "close" });
               break;
             case "gripper_open":
-              gripperState = true;
+              sharedState.gripperState = true;
+              notifyListeners();
               sharedSocket?.emit("cmd_gripper", { action: "open" });
               break;
             case "gripper_close":
-              gripperState = false;
+              sharedState.gripperState = false;
+              notifyListeners();
               sharedSocket?.emit("cmd_gripper", { action: "close" });
               break;
             case "mode_toggle":
@@ -469,8 +477,16 @@ export function useROVSocket() {
   const sendArm = () => sharedSocket?.emit("cmd_arm");
   const sendDisarm = () => sharedSocket?.emit("cmd_disarm");
   const sendSetMode = (mode: string) => sharedSocket?.emit("cmd_set_mode", { mode });
-  const sendGripper = (action: "open" | "close") => sharedSocket?.emit("cmd_gripper", { action });
-  const sendLight = (state: boolean) => sharedSocket?.emit("cmd_light", { state });
+  const sendGripper = (action: "open" | "close") => {
+    sharedState.gripperState = action === "open";
+    notifyListeners();
+    sharedSocket?.emit("cmd_gripper", { action });
+  };
+  const sendLight = (state: boolean) => {
+    sharedState.lightState = state;
+    notifyListeners();
+    sharedSocket?.emit("cmd_light", { state });
+  };
   const sendAutonomousStart = (targetId: string) =>
     sharedSocket?.emit("cmd_autonomous_start", { target_id: targetId });
   const sendAutonomousStop = () =>
