@@ -121,9 +121,10 @@ function VisionCenter() {
           <span className="label-caps">University</span>
           <span className="text-foreground">Politeknik Negeri Banyuwangi</span>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-xs leading-none">{timeStr}</div>
-          <div className="text-[10px] text-muted-foreground mt-1">{dayName}, {dateStr}</div>
+        <div className="flex items-center gap-2 font-mono text-xs text-right">
+          <span className="text-muted-foreground text-[11px]">{dayName}, {dateStr}</span>
+          <span className="text-muted-foreground/40">•</span>
+          <span className="font-bold text-foreground">{timeStr}</span>
         </div>
       </header>
 

@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import {
   Power, ToggleLeft, Play, RotateCcw,
   Volume2, VolumeX, ShieldAlert, Gamepad2, Keyboard, Bug, Settings, X, RotateCw, Crosshair,
-  Activity, Radio,
+  Activity, Radio, Download, Upload, FileJson,
 } from "lucide-react";
 import rovImage from "../assets/rov.png";
 import { useROVSocket } from "../hooks/useROVSocket";
@@ -122,8 +122,8 @@ const PS2_BUTTONS: Record<number, { label: string; sym: string; color: string }>
   7: { label: "R1 Bumper", sym: "R1", color: "text-amber-400" },
   8: { label: "Select", sym: "SL", color: "text-slate-400" },
   9: { label: "Start", sym: "ST", color: "text-slate-400" },
-  10: { label: "L3 (Tombol Pentulan Stick Kiri)", sym: "L3 🕹️", color: "text-cyan-300 font-bold" },
-  11: { label: "R3 (Tombol Pentulan Stick Kanan)", sym: "R3 🕹️", color: "text-cyan-300 font-bold" },
+  10: { label: "L3 (Tombol Pentulan Stick Kiri)", sym: "L3", color: "text-cyan-300 font-bold" },
+  11: { label: "R3 (Tombol Pentulan Stick Kanan)", sym: "R3", color: "text-cyan-300 font-bold" },
   12: { label: "D-pad ↑ (Up)", sym: "↑", color: "text-amber-400" },
   13: { label: "D-pad ↓ (Down)", sym: "↓", color: "text-amber-400" },
   14: { label: "D-pad ← (Left)", sym: "←", color: "text-amber-400" },
@@ -180,6 +180,7 @@ interface MappingModalProps {
 }
 
 function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: MappingModalProps) {
+  const socket = useROVSocket();
   const [tab, setTab] = useState<"axis" | "button">("button");
   const [draftAxis, setDraftAxis] = useState<GPMapping>({ ...axisMapping });
   const [draftBtn, setDraftBtn] = useState<ButtonMapping>({ ...btnMapping });
@@ -189,6 +190,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
   const [liveBtns, setLiveBtns] = useState<boolean[]>([]);
   const [prevBtns, setPrevBtns] = useState<boolean[]>([]);
   const [activeGpName, setActiveGpName] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string>("");
 
   const detectAxisRef = useRef<keyof GPMapping | null>(null);
   const detectBtnRef = useRef<number | null>(null);
@@ -285,7 +287,57 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
 
   const gpAvail = activeGpName !== null || liveBtns.length > 0;
 
-  const handleSave = () => { saveLS(LS_AXIS, draftAxis); saveLS(LS_BTN, draftBtn); onSave(draftAxis, draftBtn); onClose(); };
+  const handleExportJson = () => {
+    const config = {
+      app: "ROV_JOYSTICK_MAPPING",
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      axisMapping: draftAxis,
+      buttonMapping: draftBtn,
+    };
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `rov_joystick_mapping_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatusMsg("✅ Mapping JSON berhasil di-unduh!");
+    setTimeout(() => setStatusMsg(""), 3500);
+  };
+
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data && (data.axisMapping || data.buttonMapping)) {
+          if (data.axisMapping) setDraftAxis({ ...DEFAULT_AXIS_MAPPING, ...data.axisMapping });
+          if (data.buttonMapping) setDraftBtn({ ...DEFAULT_BUTTON_MAPPING, ...data.buttonMapping });
+          setStatusMsg("✅ Konfigurasi mapping berhasil di-upload!");
+        } else {
+          setStatusMsg("❌ File JSON tidak memiliki format mapping yang valid!");
+        }
+      } catch {
+        setStatusMsg("❌ Gagal membaca file JSON!");
+      }
+      setTimeout(() => setStatusMsg(""), 4000);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleSave = () => {
+    saveLS(LS_AXIS, draftAxis);
+    saveLS(LS_BTN, draftBtn);
+    socket.sendSaveMapping(draftAxis, draftBtn);
+    onSave(draftAxis, draftBtn);
+    onClose();
+  };
 
   const setButtonAction = (btnIdx: number, action: ROVAction) => {
     setDraftBtn(prev => ({ ...prev, [btnIdx]: action }));
@@ -300,41 +352,75 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
   ])).sort((a, b) => a - b).slice(0, 20);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="relative bg-[oklch(0.13_0.028_250)] border border-panel-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+      <div className="relative bg-gradient-to-b from-[oklch(0.14_0.03_250)] via-[oklch(0.12_0.026_250)] to-[oklch(0.09_0.02_250)] border border-cyan-500/40 rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.18)] w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-panel-border/60 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-panel-border/60 shrink-0 bg-slate-950/40">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-violet-500/20 border border-violet-500/30 grid place-items-center">
-              <Settings className="text-violet-400" size={16} />
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 grid place-items-center">
+              <Settings className="text-cyan-400" size={16} />
             </div>
             <div>
-              <div className="font-bold text-sm text-foreground">Controller Mapping — PS2</div>
-              <div className="text-[10px] text-muted-foreground">Assign axes and buttons to ROV functions</div>
+              <div className="font-bold text-sm text-foreground flex items-center gap-2">
+                <span>Controller Mapping — PS2 &amp; Gamepad</span>
+                <span className="text-[9px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/30">TACTICAL HUD</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground">Assign axis analog dan tombol ke fungsi kendali ROV</div>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-panel border border-transparent hover:border-panel-border cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-cyan-500/10 border border-transparent hover:border-cyan-500/30 cursor-pointer text-muted-foreground hover:text-cyan-300 transition-colors">
             <X size={16} />
           </button>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex px-5 pt-3 gap-2 shrink-0">
-          {(["button", "axis"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${tab === t ? "bg-violet-500/20 text-violet-300 border-violet-500/40" : "bg-panel/50 border-panel-border/50 text-muted-foreground hover:text-foreground"}`}>
-              {t === "button" ? "🎮 Button Mapping" : "🕹️ Axis Mapping"}
+        {/* Tab switcher & JSON Import/Export Actions */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-panel-border/40 shrink-0 gap-2 bg-slate-950/20">
+          <div className="flex gap-2">
+            {(["button", "axis"] as const).map(t => (
+              <button key={t} onClick={() => setTab(t)}
+                className={`px-3.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${tab === t ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_12px_rgba(6,182,212,0.25)]" : "bg-panel/40 border-panel-border/60 text-muted-foreground hover:text-foreground hover:bg-panel/60"}`}>
+                {t === "button" ? "🎮 Button Mapping" : "🕹️ Axis Mapping"}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportJson}
+              title="Unduh konfigurasi joystick ke file JSON"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 border border-cyan-500/35 text-cyan-300 hover:bg-cyan-500/25 text-[11px] font-bold transition-all cursor-pointer shadow-sm"
+            >
+              <Download size={13} />
+              <span>Unduh JSON</span>
             </button>
-          ))}
+            <label
+              title="Upload file JSON konfigurasi joystick"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 hover:bg-emerald-500/25 text-[11px] font-bold transition-all cursor-pointer shadow-sm"
+            >
+              <Upload size={13} />
+              <span>Upload JSON</span>
+              <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
+            </label>
+          </div>
         </div>
 
         {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 pr-3.5 scrollbar-thin">
+
+          {/* Status Message Notification */}
+          {statusMsg && (
+            <div className="bg-cyan-500/15 border border-cyan-500/40 text-cyan-200 px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between shadow-lg">
+              <span>{statusMsg}</span>
+              <button onClick={() => setStatusMsg("")} className="text-cyan-400 hover:text-white cursor-pointer">
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* Gamepad Status Banner */}
           {gpAvail ? (
-            <div className="bg-emerald-500/15 border border-emerald-500/40 rounded-xl p-3 flex items-center justify-between text-emerald-300 text-xs font-semibold">
+            <div className="bg-emerald-500/15 border border-emerald-500/40 rounded-xl p-3 flex items-center justify-between text-emerald-300 text-xs font-semibold shadow-sm">
               <div className="flex items-center gap-2 truncate">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
                 <span className="truncate">✓ CONTROLLER TERHUBUNG: <strong className="font-mono text-emerald-200">{activeGpName}</strong></span>
@@ -342,7 +428,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
               <span className="text-[10px] text-emerald-400 font-mono shrink-0">Tekan tombol / gerak stik</span>
             </div>
           ) : (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-center justify-between text-amber-300 text-xs font-semibold">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-center justify-between text-amber-300 text-xs font-semibold shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
                 <span>⚠ JOYSTICK BELUM AKTIF DI BROWSER</span>
@@ -354,29 +440,29 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
           {/* ── BUTTON MAPPING TAB ── */}
           {tab === "button" && (
             <>
-              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              <div className="text-[10px] font-bold text-cyan-300/80 uppercase tracking-widest">
                 Button → ROV Action Assignment
               </div>
-              <div className="text-[9px] text-muted-foreground -mt-2">
-                Tekan tombol di joystick untuk lihat yang mana (akan menyala hijau terang saat ditekan), lalu assign aksi.
+              <div className="text-[9.5px] text-muted-foreground -mt-2">
+                Tekan tombol di joystick untuk melihat respon tombol (menyala hijau terang saat ditekan), lalu pilih fungsi ROV.
               </div>
 
               {/* Pentulan Joystick Directions Box (Analog Sticks 20-27) */}
-              <div className="bg-violet-500/10 border border-violet-500/30 rounded-xl p-3.5 space-y-3">
+              <div className="bg-[oklch(0.12_0.028_250)] border border-cyan-500/30 rounded-xl p-3.5 space-y-3 shadow-inner">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-violet-300 font-bold text-xs">
+                  <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs">
                     <span className="text-base">🕹️</span>
                     <span>MAPPING PENTULAN JOYSTICK (ANALOG STICKS)</span>
                   </div>
-                  <span className="text-[9px] text-violet-400 font-mono">Gerakkan Pentulan Stick</span>
+                  <span className="text-[9px] text-cyan-400 font-mono">Gerakkan Pentulan Stick</span>
                 </div>
                 <div className="text-[9px] text-muted-foreground -mt-2">
                   Gerakkan analog stick kiri/kanan ke arah yang diinginkan (akan menyala hijau live) untuk assign fungsi khusus!
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                   {/* Left Stick Directions (20-23) */}
-                  <div className="bg-[oklch(0.14_0.02_250)] p-2.5 rounded-lg border border-cyan-500/30 space-y-2">
+                  <div className="bg-panel/40 p-2.5 rounded-xl border border-cyan-500/30 space-y-2">
                     <div className="text-[10px] font-bold text-cyan-300 flex items-center gap-1">
                       <span>🕹️ Pentulan Kiri (Left Stick)</span>
                     </div>
@@ -386,15 +472,15 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                         const action = draftBtn[btnIdx] ?? "none";
                         const pressed = liveBtns[btnIdx] ?? false;
                         return (
-                          <div key={btnIdx} className={`p-2 rounded border transition-all duration-75 flex items-center justify-between gap-2 ${pressed
+                          <div key={btnIdx} className={`p-2 rounded-lg border transition-all duration-75 flex items-center justify-between gap-2 ${pressed
                             ? "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400 shadow-md scale-[1.02]"
-                            : "border-panel-border/40 bg-panel/50"
+                            : "border-panel-border/40 bg-slate-950/60"
                             }`}>
                             <span className={`text-[10px] font-bold shrink-0 ${pressed ? "text-emerald-300" : ps2?.color}`}>{ps2?.sym}</span>
                             <select
                               value={action}
                               onChange={e => setButtonAction(btnIdx, e.target.value as ROVAction)}
-                              className="bg-panel border border-panel-border rounded px-1.5 py-0.5 text-[10px] font-mono text-foreground focus:outline-none focus:border-cyan-400 min-w-0 cursor-pointer">
+                              className="bg-slate-950 border border-cyan-500/30 rounded-md px-2 py-1 text-[10px] font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 min-w-0 cursor-pointer">
                               {(Object.keys(ACTION_META) as ROVAction[]).map(a => (
                                 <option key={a} value={a}>{ACTION_META[a].label}</option>
                               ))}
@@ -406,8 +492,8 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                   </div>
 
                   {/* Right Stick Directions (24-27) */}
-                  <div className="bg-[oklch(0.14_0.02_250)] p-2.5 rounded-lg border border-violet-500/30 space-y-2">
-                    <div className="text-[10px] font-bold text-violet-300 flex items-center gap-1">
+                  <div className="bg-panel/40 p-2.5 rounded-xl border border-cyan-500/30 space-y-2">
+                    <div className="text-[10px] font-bold text-cyan-300 flex items-center gap-1">
                       <span>🕹️ Pentulan Kanan (Right Stick)</span>
                     </div>
                     <div className="grid grid-cols-1 gap-1.5">
@@ -416,15 +502,15 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                         const action = draftBtn[btnIdx] ?? "none";
                         const pressed = liveBtns[btnIdx] ?? false;
                         return (
-                          <div key={btnIdx} className={`p-2 rounded border transition-all duration-75 flex items-center justify-between gap-2 ${pressed
+                          <div key={btnIdx} className={`p-2 rounded-lg border transition-all duration-75 flex items-center justify-between gap-2 ${pressed
                             ? "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400 shadow-md scale-[1.02]"
-                            : "border-panel-border/40 bg-panel/50"
+                            : "border-panel-border/40 bg-slate-950/60"
                             }`}>
                             <span className={`text-[10px] font-bold shrink-0 ${pressed ? "text-emerald-300" : ps2?.color}`}>{ps2?.sym}</span>
                             <select
                               value={action}
                               onChange={e => setButtonAction(btnIdx, e.target.value as ROVAction)}
-                              className="bg-panel border border-panel-border rounded px-1.5 py-0.5 text-[10px] font-mono text-foreground focus:outline-none focus:border-violet-400 min-w-0 cursor-pointer">
+                              className="bg-slate-950 border border-cyan-500/30 rounded-md px-2 py-1 text-[10px] font-mono text-cyan-200 focus:outline-none focus:border-cyan-400 min-w-0 cursor-pointer">
                               {(Object.keys(ACTION_META) as ROVAction[]).map(a => (
                                 <option key={a} value={a}>{ACTION_META[a].label}</option>
                               ))}
@@ -438,7 +524,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
               </div>
 
               {/* D-pad info */}
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-[9px] text-amber-300/80">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2 text-[9px] text-amber-300/80">
                 <span className="font-bold text-amber-300">⚠ D-pad:</span> D-pad terintegrasi otomatis dari Axis #9. Tekan D-pad Atas/Bawah/Kiri/Kanan untuk tes menyala hijau.
               </div>
 
@@ -453,13 +539,13 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                     <div key={btnIdx} className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all duration-75 ${pressed
                       ? "border-emerald-400 bg-emerald-500/25 ring-2 ring-emerald-400/80 shadow-[0_0_20px_rgba(16,185,129,0.5)] scale-[1.01]"
                       : hasAssign
-                        ? "border-violet-500/30 bg-violet-500/5"
-                        : "border-panel-border/40 bg-[oklch(0.16_0.02_250)]"
+                        ? "border-cyan-500/40 bg-cyan-500/5"
+                        : "border-panel-border/40 bg-[oklch(0.14_0.02_250)]"
                       }`}>
                       {/* Button symbol badge */}
-                      <div className={`w-10 h-10 rounded-lg border flex items-center justify-center font-bold text-sm shrink-0 transition-all ${pressed
+                      <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-bold text-sm shrink-0 transition-all ${pressed
                         ? "bg-emerald-400 text-slate-950 border-emerald-200 font-extrabold scale-110 shadow-lg"
-                        : `bg-panel border-panel-border ${ps2?.color ?? "text-muted-foreground"}`
+                        : `bg-slate-950 border-cyan-500/30 ${ps2?.color ?? "text-muted-foreground"}`
                         }`}>
                         {ps2?.sym ?? btnIdx}
                       </div>
@@ -478,7 +564,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                       <select
                         value={action}
                         onChange={e => setButtonAction(btnIdx, e.target.value as ROVAction)}
-                        className="flex-1 bg-panel border border-panel-border rounded-lg px-2 py-1.5 text-[11px] font-mono text-foreground cursor-pointer focus:outline-none focus:border-violet-500/50 min-w-0">
+                        className="flex-1 bg-slate-950 border border-cyan-500/30 rounded-xl px-2.5 py-1.5 text-[11px] font-mono text-cyan-200 cursor-pointer focus:outline-none focus:border-cyan-400 min-w-0">
                         {(Object.keys(ACTION_META) as ROVAction[]).map(a => (
                           <option key={a} value={a}>{ACTION_META[a].label}</option>
                         ))}
@@ -498,22 +584,22 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
               </div>
 
               {/* Current mapping summary */}
-              <div className="bg-black/20 rounded-xl border border-panel-border/30 p-3">
-                <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Current Mapping Summary</div>
+              <div className="bg-slate-950/60 rounded-xl border border-cyan-500/30 p-3 shadow-inner">
+                <div className="text-[9px] font-bold text-cyan-300/80 uppercase tracking-widest mb-2">Current Mapping Summary</div>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(draftBtn).filter(([, a]) => a !== "none").map(([btnIdx, action]) => {
                     const ps2 = PS2_BUTTONS[Number(btnIdx)];
                     const act = ACTION_META[action as ROVAction];
                     return (
-                      <div key={btnIdx} className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px] font-bold bg-panel border-panel-border/50 ${act.color}`}>
+                      <div key={btnIdx} className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px] font-bold bg-slate-900 border-cyan-500/30 ${act.color}`}>
                         <span className={`${ps2?.color ?? ""}`}>{ps2?.sym ?? `B${btnIdx}`}</span>
-                        <span className="text-panel-border/80">→</span>
+                        <span className="text-muted-foreground">→</span>
                         <span>{action.replace(/_/g, " ")}</span>
                       </div>
                     );
                   })}
                   {Object.values(draftBtn).every(a => a === "none") && (
-                    <div className="text-[9px] text-muted-foreground">No buttons assigned yet</div>
+                    <div className="text-[9px] text-muted-foreground">Belum ada tombol yang di-assign</div>
                   )}
                 </div>
               </div>
@@ -523,21 +609,21 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
           {/* ── AXIS MAPPING TAB ── */}
           {tab === "axis" && (
             <>
-              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              <div className="text-[10px] font-bold text-cyan-300/80 uppercase tracking-widest">
                 Stick Axis → ROV Movement Channel
               </div>
 
               {detectAxis && (
-                <div className="bg-violet-500/10 border border-violet-500/40 rounded-xl p-3 flex items-center gap-3 animate-pulse">
-                  <Crosshair className="text-violet-400 shrink-0" size={18} />
+                <div className="bg-cyan-500/15 border border-cyan-500/40 rounded-xl p-3 flex items-center gap-3 animate-pulse">
+                  <Crosshair className="text-cyan-400 shrink-0" size={18} />
                   <div>
-                    <div className="text-violet-300 font-bold text-sm">DETECT MODE</div>
-                    <div className="text-violet-400/80 text-[10px]">
+                    <div className="text-cyan-300 font-bold text-sm">DETECT MODE</div>
+                    <div className="text-cyan-400/80 text-[10px]">
                       Gerak axis yang ingin di-assign ke <span className={AXIS_FN_META[detectAxis].color}>{AXIS_FN_META[detectAxis].label}</span>
                     </div>
                   </div>
                   <button onClick={() => { setDetectAxis(null); detectAxisRef.current = null; }}
-                    className="ml-auto px-2 py-1 rounded-lg border border-violet-500/40 text-violet-400 text-[9px] font-bold cursor-pointer">
+                    className="ml-auto px-2 py-1 rounded-lg border border-cyan-500/40 text-cyan-400 text-[9px] font-bold cursor-pointer hover:bg-cyan-500/20">
                     Batal
                   </button>
                 </div>
@@ -551,7 +637,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                   const pct = ((applyDZ(cur.invert ? -axisV : axisV) + 1) / 2) * 100;
                   const isDetecting = detectAxis === fn;
                   return (
-                    <div key={fn} className={`rounded-xl border p-3 transition-all ${isDetecting ? "border-violet-500/60 bg-violet-500/5" : "border-panel-border/50 bg-[oklch(0.16_0.024_250)]"}`}>
+                    <div key={fn} className={`rounded-xl border p-3 transition-all ${isDetecting ? "border-cyan-500/60 bg-cyan-500/10" : "border-cyan-500/30 bg-[oklch(0.14_0.024_250)]"}`}>
                       <div className="flex items-center gap-3">
                         <div className="w-24 shrink-0">
                           <div className={`font-bold text-sm ${meta.color}`}>{meta.label}</div>
@@ -560,17 +646,17 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                         <div className="flex items-center gap-1.5 flex-1 flex-wrap">
                           <span className="text-[9px] text-muted-foreground font-mono shrink-0">Axis</span>
                           <select value={cur.axisIdx} onChange={e => setDraftAxis(prev => ({ ...prev, [fn]: { ...prev[fn], axisIdx: Number(e.target.value) } }))}
-                            className="bg-panel border border-panel-border rounded-lg px-2 py-1 text-[11px] font-mono text-foreground cursor-pointer focus:outline-none w-20 shrink-0">
+                            className="bg-slate-950 border border-cyan-500/30 rounded-lg px-2 py-1 text-[11px] font-mono text-cyan-200 cursor-pointer focus:outline-none w-20 shrink-0">
                             {Array.from({ length: Math.max(10, liveAxes.length) }, (_, i) => (
                               <option key={i} value={i}>Axis {i}</option>
                             ))}
                           </select>
                           <button onClick={() => setDraftAxis(prev => ({ ...prev, [fn]: { ...prev[fn], invert: !prev[fn].invert } }))}
-                            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-bold transition-all cursor-pointer shrink-0 ${cur.invert ? "bg-orange-500/20 text-orange-400 border-orange-500/40" : "bg-panel border-panel-border text-muted-foreground hover:text-foreground"}`}>
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[9px] font-bold transition-all cursor-pointer shrink-0 ${cur.invert ? "bg-orange-500/20 text-orange-400 border-orange-500/40" : "bg-panel border-panel-border text-muted-foreground hover:text-foreground"}`}>
                             <RotateCw size={9} />{cur.invert ? "INVERTED" : "NORMAL"}
                           </button>
                           <button onClick={() => { setDetectAxis(fn); detectAxisRef.current = fn; }} disabled={!gpAvail}
-                            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-bold transition-all cursor-pointer shrink-0 disabled:opacity-40 ${isDetecting ? "bg-violet-500/20 text-violet-300 border-violet-500/50 animate-pulse" : "bg-panel border-panel-border text-muted-foreground hover:text-violet-400"}`}>
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[9px] font-bold transition-all cursor-pointer shrink-0 disabled:opacity-40 ${isDetecting ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 animate-pulse" : "bg-panel border-panel-border text-muted-foreground hover:text-cyan-400"}`}>
                             <Crosshair size={9} />{isDetecting ? "DETECTING..." : "DETECT"}
                           </button>
                         </div>
@@ -582,7 +668,7 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                           </div>
                           <div className="h-1.5 w-full bg-panel-border/30 rounded-full overflow-hidden relative">
                             <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/30 z-10" />
-                            <div className={`h-full rounded-full transition-all ${Math.abs(axisV) > DEADZONE ? "bg-gradient-to-r from-violet-500 to-cyan-400" : "bg-panel-border/50"}`}
+                            <div className={`h-full rounded-full transition-all ${Math.abs(axisV) > DEADZONE ? "bg-gradient-to-r from-emerald-500 to-cyan-400" : "bg-panel-border/50"}`}
                               style={{ width: `${pct}%` }} />
                           </div>
                         </div>
@@ -600,14 +686,14 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
                       const v = liveAxes[i] ?? 0;
                       const used = Object.values(draftAxis).some(m => m.axisIdx === i);
                       return (
-                        <div key={i} className={`p-2 rounded-lg border ${used ? "border-accent/30 bg-accent/5" : "border-panel-border/30 bg-black/10"}`}>
+                        <div key={i} className={`p-2 rounded-lg border ${used ? "border-cyan-500/40 bg-cyan-500/10" : "border-panel-border/30 bg-black/10"}`}>
                           <div className="flex justify-between text-[8px] font-mono mb-1">
-                            <span className={used ? "text-accent font-bold" : "text-muted-foreground"}>A{i}{used ? "●" : ""}</span>
+                            <span className={used ? "text-cyan-300 font-bold" : "text-muted-foreground"}>A{i}{used ? "●" : ""}</span>
                             <span className="text-foreground">{v.toFixed(2)}</span>
                           </div>
                           <div className="h-1 w-full bg-panel-border/30 rounded-full overflow-hidden relative">
                             <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/20 z-10" />
-                            <div className={`h-full rounded-full ${Math.abs(v) > DEADZONE ? "bg-accent" : "bg-panel-border/50"}`} style={{ width: `${((v + 1) / 2) * 100}%` }} />
+                            <div className={`h-full rounded-full ${Math.abs(v) > DEADZONE ? "bg-cyan-400" : "bg-panel-border/50"}`} style={{ width: `${((v + 1) / 2) * 100}%` }} />
                           </div>
                         </div>
                       );
@@ -620,15 +706,15 @@ function MappingModal({ gpIdx, axisMapping, btnMapping, onSave, onClose }: Mappi
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 px-5 py-4 border-t border-panel-border/40 shrink-0">
+        <div className="flex gap-2 px-5 py-3.5 border-t border-panel-border/40 shrink-0 bg-slate-950/40">
           <button onClick={() => { setDraftAxis({ ...DEFAULT_AXIS_MAPPING }); setDraftBtn({ ...DEFAULT_BUTTON_MAPPING }); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-panel-border text-muted-foreground text-xs font-semibold hover:text-foreground cursor-pointer transition-colors">
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-panel-border/60 text-muted-foreground text-xs font-semibold hover:text-foreground hover:bg-panel/50 cursor-pointer transition-colors">
             <RotateCw size={12} /> Reset Default
           </button>
-          <button onClick={onClose} className="flex-1 px-3 py-2 rounded-lg border border-panel-border text-muted-foreground text-xs font-semibold hover:text-foreground cursor-pointer transition-colors">
+          <button onClick={onClose} className="flex-1 px-3.5 py-2 rounded-xl border border-panel-border/60 text-muted-foreground text-xs font-semibold hover:text-foreground hover:bg-panel/50 cursor-pointer transition-colors">
             Batal
           </button>
-          <button onClick={handleSave} className="flex-1 px-3 py-2 rounded-lg bg-violet-500 text-white text-xs font-bold hover:opacity-90 cursor-pointer transition-opacity">
+          <button onClick={handleSave} className="flex-1 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-extrabold text-xs tracking-wide shadow-[0_0_20px_rgba(6,182,212,0.35)] hover:brightness-110 active:scale-[0.99] cursor-pointer transition-all">
             Simpan Mapping
           </button>
         </div>
@@ -850,9 +936,10 @@ function PilotControlsPage() {
             className={`flex items-center gap-1 px-2 py-1 rounded text-[9px] font-bold border cursor-pointer transition-colors ${showDebug ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/40" : "bg-panel border-panel-border text-muted-foreground hover:text-foreground"}`}>
             <Bug size={10} /> DEBUG
           </button>
-          <div className="text-right">
-            <div className="font-mono text-xs leading-none">{clk.toLocaleTimeString("en-GB", { hour12: false })}</div>
-            <div className="text-[10px] text-muted-foreground mt-1">{clk.toLocaleDateString("en-GB", { weekday: "long" })}, {clk.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+          <div className="flex items-center gap-2 font-mono text-xs text-right">
+            <span className="text-muted-foreground text-[11px]">{clk.toLocaleDateString("en-GB", { weekday: "long" })}, {clk.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+            <span className="text-muted-foreground/40">•</span>
+            <span className="font-bold text-foreground">{clk.toLocaleTimeString("en-GB", { hour12: false })}</span>
           </div>
         </div>
       </header>
@@ -882,40 +969,82 @@ function PilotControlsPage() {
       {/* 3-column */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col lg:flex-row gap-2.5 overflow-y-auto lg:overflow-hidden">
 
-        {/* Col 1: Attitude */}
-        <div className="panel flex flex-col flex-1 min-h-[380px] lg:h-full p-3 justify-between">
+        {/* Col 1: Attitude Flight Instrument - Spacious Full-Width Cockpit Display */}
+        <div className="panel flex flex-col lg:w-[52%] shrink-0 min-h-[380px] lg:h-full p-3 justify-between">
           <div className="border-b border-panel-border/60 pb-2 shrink-0 flex items-center justify-between">
             <span className="label-caps font-bold">Attitude Flight Instrument</span>
             <span className="text-[9px] font-mono text-cyan-400 font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">AHRS HUD</span>
           </div>
 
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2.5 py-2.5 min-h-0">
-            <div className="flex flex-col gap-1.5 min-h-0">
-              <span className="text-[9px] text-cyan-300 font-semibold uppercase tracking-wide">Attitude Indicator</span>
-              <div className="flex-1 min-h-[140px] bg-gradient-to-b from-[oklch(0.13_0.028_250)] to-[oklch(0.10_0.02_250)] rounded-xl border border-cyan-500/30 overflow-hidden grid place-items-center relative shadow-[inset_0_0_20px_rgba(6,182,212,0.08)]">
-                <img src={rovImage} alt="ROV" className="w-full h-full object-contain p-3 drop-shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                  style={{ transform: `rotate(${roll}deg) scale(${Math.max(0.65, 1 - Math.abs(pitch) / 180)})`, transition: "transform 0.1s ease-out" }} />
-                <div className="absolute bottom-2 left-2 text-[10px] font-mono font-bold text-cyan-300 bg-slate-950/80 px-2 py-0.5 rounded-md border border-cyan-500/30 backdrop-blur-md">
-                  R: {roll.toFixed(1)}° P: {pitch.toFixed(1)}°
+          {/* Main Flight Horizon & Attitude Indicator - Full Width */}
+          <div className="flex-1 flex flex-col gap-2.5 py-2 min-h-0">
+            <div className="flex-1 flex flex-col gap-1.5 min-h-[220px]">
+              <div className="flex items-center justify-between">
+                <span className="text-[9.5px] text-cyan-300 font-bold uppercase tracking-wide flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  Attitude Indicator &amp; Gyro Horizon
+                </span>
+                <span className="text-[8.5px] font-mono text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/30">
+                  R: {roll.toFixed(1)}° | P: {pitch.toFixed(1)}°
+                </span>
+              </div>
+
+              <div className="flex-1 bg-gradient-to-b from-[oklch(0.13_0.028_250)] via-[oklch(0.11_0.024_250)] to-[oklch(0.09_0.02_250)] rounded-xl border border-cyan-500/30 overflow-hidden flex items-center justify-center relative shadow-[inset_0_0_25px_rgba(6,182,212,0.1)]">
+                {/* HUD Pitch Lines Background */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center opacity-25 pointer-events-none">
+                  <div className="w-48 h-0.5 bg-cyan-400/60 mb-8 flex justify-between items-center text-[8px] font-mono text-cyan-300 px-1"><span>+30°</span><span>+30°</span></div>
+                  <div className="w-32 h-0.5 bg-cyan-400/40 mb-8 flex justify-between items-center text-[8px] font-mono text-cyan-300 px-1"><span>+15°</span><span>+15°</span></div>
+                  <div className="w-64 h-0.5 bg-cyan-400/90 mb-0 flex justify-between items-center text-[9px] font-mono text-cyan-300 px-2 font-bold"><span>0°</span><span>0°</span></div>
+                  <div className="w-32 h-0.5 bg-cyan-400/40 mt-8 flex justify-between items-center text-[8px] font-mono text-cyan-300 px-1"><span>-15°</span><span>-15°</span></div>
+                  <div className="w-48 h-0.5 bg-cyan-400/60 mt-8 flex justify-between items-center text-[8px] font-mono text-cyan-300 px-1"><span>-30°</span><span>-30°</span></div>
+                </div>
+
+                {/* ROV 3D Model Rendering - Large & Spacious */}
+                <img src={rovImage} alt="ROV" className="w-full h-full max-h-[260px] object-contain p-4 drop-shadow-[0_0_20px_rgba(6,182,212,0.4)] relative z-10"
+                  style={{ transform: `rotate(${roll}deg) scale(${Math.max(0.75, 1 - Math.abs(pitch) / 180)})`, transition: "transform 0.1s ease-out" }} />
+                
+                <div className="absolute top-2 left-2 text-[9px] font-mono font-bold text-cyan-300 bg-slate-950/85 px-2 py-1 rounded-md border border-cyan-500/40 backdrop-blur-md z-20 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  <span>AHRS ORIENTATION LIVE</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5 min-h-0">
-              <span className="text-[9px] text-cyan-300 font-semibold uppercase tracking-wide">Compass (Yaw)</span>
-              <div className="flex-1 min-h-[140px] bg-gradient-to-b from-[oklch(0.13_0.028_250)] to-[oklch(0.10_0.02_250)] rounded-xl border border-cyan-500/30 overflow-hidden grid place-items-center relative shadow-[inset_0_0_20px_rgba(6,182,212,0.08)]">
-                <svg viewBox="0 0 100 100" className="w-full h-full p-2.5">
-                  <g transform={`rotate(${yaw},50,50)`} style={{ transition: "transform 0.1s ease-out" }}>
-                    <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(6, 182, 212, 0.4)" strokeWidth="1.5" />
-                    <polygon points="50,15 45,25 55,25" fill="#06b6d4" className="drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]" />
-                    <text x="50" y="35" fontSize="8" fill="#06b6d4" textAnchor="middle" fontFamily="monospace" fontWeight="extrabold">N</text>
-                    <line x1="50" y1="25" x2="50" y2="75" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="2 2" />
-                    <line x1="25" y1="50" x2="75" y2="50" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="2 2" />
-                  </g>
-                  <circle cx="50" cy="50" r="3" fill="#06b6d4" />
-                </svg>
-                <div className="absolute bottom-2 right-2 text-[10px] font-mono font-bold text-cyan-300 bg-slate-950/80 px-2 py-0.5 rounded-md border border-cyan-500/30 backdrop-blur-md">
-                  HDG: {yaw.toFixed(1)}°
+            {/* Bottom Section: Compass & Telemetry Readouts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 shrink-0">
+              {/* Compass (Yaw) */}
+              <div className="bg-gradient-to-b from-[oklch(0.13_0.028_250)] to-[oklch(0.09_0.02_250)] rounded-xl border border-cyan-500/30 p-2.5 flex items-center gap-3">
+                <div className="w-20 h-20 shrink-0 relative flex items-center justify-center">
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <g transform={`rotate(${yaw},50,50)`} style={{ transition: "transform 0.1s ease-out" }}>
+                      <circle cx="50" cy="50" r="34" fill="none" stroke="rgba(6, 182, 212, 0.4)" strokeWidth="1.5" />
+                      <polygon points="50,12 44,24 56,24" fill="#06b6d4" className="drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]" />
+                      <text x="50" y="34" fontSize="8" fill="#06b6d4" textAnchor="middle" fontFamily="monospace" fontWeight="extrabold">N</text>
+                      <text x="75" y="53" fontSize="7" fill="rgba(6, 182, 212, 0.7)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">E</text>
+                      <text x="50" y="72" fontSize="7" fill="rgba(6, 182, 212, 0.7)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">S</text>
+                      <text x="25" y="53" fontSize="7" fill="rgba(6, 182, 212, 0.7)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">W</text>
+                      <line x1="50" y1="20" x2="50" y2="80" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="2 2" />
+                      <line x1="20" y1="50" x2="80" y2="50" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="2 2" />
+                    </g>
+                    <circle cx="50" cy="50" r="3" fill="#06b6d4" />
+                  </svg>
+                </div>
+                <div className="flex flex-col justify-center">
+                  <div className="text-[8.5px] font-mono text-muted-foreground uppercase font-semibold">Heading / Yaw</div>
+                  <div className="text-base font-mono font-extrabold text-cyan-300 leading-tight">{yaw.toFixed(1)}°</div>
+                  <div className="text-[8px] font-mono text-cyan-400/80 mt-0.5">MAGNETIC YAW</div>
+                </div>
+              </div>
+
+              {/* Telemetry Summary Cards */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="bg-panel/40 border border-panel-border/50 rounded-xl p-2 flex flex-col justify-center text-center">
+                  <div className="text-[8px] text-muted-foreground uppercase font-bold">Roll Angle</div>
+                  <div className="text-sm font-mono font-extrabold text-cyan-300">{roll.toFixed(1)}°</div>
+                </div>
+                <div className="bg-panel/40 border border-panel-border/50 rounded-lg p-2 flex flex-col justify-center text-center">
+                  <div className="text-[8px] text-muted-foreground uppercase font-bold">Pitch Angle</div>
+                  <div className="text-sm font-mono font-extrabold text-cyan-300">{pitch.toFixed(1)}°</div>
                 </div>
               </div>
             </div>
@@ -929,54 +1058,131 @@ function PilotControlsPage() {
           </div>
         </div>
 
-        {/* Col 2: Switchboard */}
+        {/* Col 2: Pilot Controls & Diagnostics Cockpit */}
         <div className="panel flex flex-col flex-1 min-h-[380px] lg:h-full p-3 justify-between">
-          <div className="border-b border-panel-border/60 pb-2 shrink-0"><span className="label-caps">Pilot Switchboard</span></div>
-          <div className="flex-1 flex flex-col gap-2 py-3 overflow-y-auto">
-            {[
-              { label: socket.telemetry?.armed ? "THRUSTERS ARMED — CLICK TO DISARM" : "ARM VESSEL MOTORS", fn: toggleArm, active: socket.telemetry?.armed, color: "red", icon: <Power size={16} /> },
-              { label: socket.telemetry?.mode === "DEPTH_HOLD" ? "STABILIZER: DEPTH HOLD" : "SET DEPTH HOLD MODE", fn: () => socket.sendSetMode("DEPTH_HOLD"), active: socket.telemetry?.mode === "DEPTH_HOLD", color: "accent", icon: <ToggleLeft size={16} /> },
-              { label: socket.telemetry?.mode === "STABILIZE" ? "STABILIZER: STABILIZE ACTIVE" : "SET STABILIZE MODE", fn: () => socket.sendSetMode("STABILIZE"), active: socket.telemetry?.mode === "STABILIZE", color: "blue", icon: <Activity size={16} /> },
-              { label: lightState ? "LED FLOODLIGHT: ON" : "LED FLOODLIGHT: OFF", fn: toggleLight, active: lightState, color: "yellow", icon: <Play size={16} /> },
-              { label: gripperState ? "VESSEL GRIPPER: OPEN" : "VESSEL GRIPPER: CLOSE", fn: toggleGrip, active: gripperState, color: "green", icon: <RotateCcw size={16} /> },
-              { label: socket.autonomousStatus?.is_active ? "AUTONOMOUS MISSION: RUNNING" : "START AUTONOMOUS MISSION", fn: () => socket.autonomousStatus?.is_active ? socket.sendAutonomousStop() : socket.sendAutonomousStart("AUTONOMOUS_MISSION"), active: !!socket.autonomousStatus?.is_active, color: "emerald", icon: <Radio size={16} /> },
-              { label: "LOCK TARGET: DOCK STATION ALPHA", fn: () => socket.sendAutonomousStart("DOCK_STATION_ALPHA"), active: socket.dockAligned, color: "purple", icon: <Crosshair size={16} /> },
-            ].map((btn, i) => (
-              <button key={i} onClick={btn.fn}
-                className={`flex items-center justify-center gap-2.5 py-2.5 rounded-lg border font-bold text-xs cursor-pointer transition-colors shrink-0 ${btn.active
-                  ? btn.color === "accent" ? "bg-accent/20 text-accent border-accent/30"
-                    : btn.color === "blue" ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                      : btn.color === "yellow" ? "bg-yellow-500/20 text-yellow-500 border-yellow-500/30"
-                        : btn.color === "green" ? "bg-green-500/20 text-green-500 border-green-500/30"
-                          : btn.color === "emerald" ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 animate-pulse"
-                            : btn.color === "purple" ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
-                              : "bg-red-500/20 text-red-400 border-red-500/30"
-                  : "bg-panel border-panel-border text-muted-foreground hover:text-foreground hover:bg-panel/60"
-                  }`}>
-                {btn.icon}<span>{btn.label}</span>
-              </button>
-            ))}
+          <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-y-auto pr-0.5 scrollbar-thin">
+            
+            {/* Pilot Switchboard Section */}
+            <div className="shrink-0 space-y-2">
+              <div className="border-b border-panel-border/60 pb-1.5 flex items-center justify-between">
+                <span className="label-caps font-bold">Pilot Switchboard</span>
+                <span className="text-[9px] font-mono text-muted-foreground font-semibold">TACTICAL CONTROLS</span>
+              </div>
 
-            {/* Pilot Input Panel */}
-            <div className="bg-[oklch(0.12_0.024_250)] rounded-xl border border-panel-border/60 p-3 shrink-0 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                {/* Arm Motors Master Switch - Full Width */}
+                <button
+                  onClick={toggleArm}
+                  className={`col-span-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border font-extrabold text-xs cursor-pointer transition-all shadow-md active:scale-[0.99] ${
+                    socket.telemetry?.armed
+                      ? "bg-red-500/20 text-red-400 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                      : "bg-gradient-to-r from-panel to-slate-900 border-panel-border text-foreground hover:bg-panel/80 hover:border-panel-border/80"
+                  }`}
+                >
+                  <Power size={16} className={socket.telemetry?.armed ? "animate-pulse" : ""} />
+                  <span>{socket.telemetry?.armed ? "THRUSTERS ARMED — CLICK TO DISARM" : "ARM VESSEL MOTORS"}</span>
+                </button>
+
+                {/* Depth Hold */}
+                <button
+                  onClick={() => socket.sendSetMode("DEPTH_HOLD")}
+                  className={`flex items-center justify-center gap-2 py-2 px-2.5 rounded-xl border font-bold text-[11px] cursor-pointer transition-all ${
+                    socket.telemetry?.mode === "DEPTH_HOLD"
+                      ? "bg-accent/20 text-accent border-accent/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]"
+                      : "bg-panel/70 border-panel-border/60 text-muted-foreground hover:text-foreground hover:bg-panel"
+                  }`}
+                >
+                  <ToggleLeft size={15} />
+                  <span className="truncate">{socket.telemetry?.mode === "DEPTH_HOLD" ? "STABILIZER: DEPTH HOLD" : "SET DEPTH HOLD"}</span>
+                </button>
+
+                {/* Stabilize */}
+                <button
+                  onClick={() => socket.sendSetMode("STABILIZE")}
+                  className={`flex items-center justify-center gap-2 py-2 px-2.5 rounded-xl border font-bold text-[11px] cursor-pointer transition-all ${
+                    socket.telemetry?.mode === "STABILIZE"
+                      ? "bg-blue-500/20 text-blue-400 border-blue-500/40 shadow-[0_0_12px_rgba(59,130,246,0.2)]"
+                      : "bg-panel/70 border-panel-border/60 text-muted-foreground hover:text-foreground hover:bg-panel"
+                  }`}
+                >
+                  <Activity size={15} />
+                  <span className="truncate">{socket.telemetry?.mode === "STABILIZE" ? "STABILIZER: ACTIVE" : "SET STABILIZE"}</span>
+                </button>
+
+                {/* Light */}
+                <button
+                  onClick={toggleLight}
+                  className={`flex items-center justify-center gap-2 py-2 px-2.5 rounded-xl border font-bold text-[11px] cursor-pointer transition-all ${
+                    lightState
+                      ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/40 shadow-[0_0_12px_rgba(234,179,8,0.2)]"
+                      : "bg-panel/70 border-panel-border/60 text-muted-foreground hover:text-foreground hover:bg-panel"
+                  }`}
+                >
+                  <Play size={15} />
+                  <span className="truncate">{lightState ? "LED FLOODLIGHT: ON" : "LED FLOODLIGHT: OFF"}</span>
+                </button>
+
+                {/* Gripper */}
+                <button
+                  onClick={toggleGrip}
+                  className={`flex items-center justify-center gap-2 py-2 px-2.5 rounded-xl border font-bold text-[11px] cursor-pointer transition-all ${
+                    gripperState
+                      ? "bg-green-500/20 text-green-400 border-green-500/40 shadow-[0_0_12px_rgba(34,197,94,0.2)]"
+                      : "bg-panel/70 border-panel-border/60 text-muted-foreground hover:text-foreground hover:bg-panel"
+                  }`}
+                >
+                  <RotateCcw size={15} />
+                  <span className="truncate">{gripperState ? "GRIPPER: OPEN" : "GRIPPER: CLOSE"}</span>
+                </button>
+
+                {/* Autonomous Mission */}
+                <button
+                  onClick={() => socket.autonomousStatus?.is_active ? socket.sendAutonomousStop() : socket.sendAutonomousStart("AUTONOMOUS_MISSION")}
+                  className={`flex items-center justify-center gap-2 py-2 px-2.5 rounded-xl border font-bold text-[11px] cursor-pointer transition-all ${
+                    socket.autonomousStatus?.is_active
+                      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 animate-pulse"
+                      : "bg-panel/70 border-panel-border/60 text-muted-foreground hover:text-foreground hover:bg-panel"
+                  }`}
+                >
+                  <Radio size={15} />
+                  <span className="truncate">{socket.autonomousStatus?.is_active ? "MISSION: RUNNING" : "START AUTONOMOUS"}</span>
+                </button>
+
+                {/* Lock Target */}
+                <button
+                  onClick={() => socket.sendAutonomousStart("DOCK_STATION_ALPHA")}
+                  className={`flex items-center justify-center gap-2 py-2 px-2.5 rounded-xl border font-bold text-[11px] cursor-pointer transition-all ${
+                    socket.dockAligned
+                      ? "bg-purple-500/20 text-purple-400 border-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+                      : "bg-panel/70 border-panel-border/60 text-muted-foreground hover:text-foreground hover:bg-panel"
+                  }`}
+                >
+                  <Crosshair size={15} />
+                  <span className="truncate">LOCK DOCK ALPHA</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Pilot Input & RC Channels Section */}
+            <div className="bg-gradient-to-b from-[oklch(0.13_0.026_250)] to-[oklch(0.10_0.02_250)] rounded-xl border border-panel-border/70 p-3 space-y-2.5 shadow-inner shrink-0">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Pilot Input</span>
+                <span className="text-[10px] text-cyan-300 font-bold uppercase tracking-widest">Pilot Input &amp; RC Telemetry</span>
                 <div className="flex items-center gap-1">
                   <Link to="/gamepad-test"
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border transition-all cursor-pointer bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[9.5px] font-bold border transition-all cursor-pointer bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
                     title="Buka Diagnostic Tester Gamepad">
                     <Gamepad2 size={10} /> TESTER
                   </Link>
                   <button onClick={() => setShowMapping(true)}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border transition-all cursor-pointer bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20">
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[9.5px] font-bold border transition-all cursor-pointer bg-violet-500/10 border-violet-500/30 text-violet-400 hover:bg-violet-500/20">
                     <Settings size={10} /> MAPPING {assignedBtnCount > 0 && <span className="bg-violet-500/30 rounded-full px-1">{assignedBtnCount}</span>}
                   </button>
                   <button onClick={() => setKbEnabled(v => !v)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border transition-all cursor-pointer ${kbEnabled ? "bg-accent/20 text-accent border-accent/40" : "bg-panel/50 border-panel-border/50 text-muted-foreground hover:text-foreground"}`}>
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9.5px] font-bold border transition-all cursor-pointer ${kbEnabled ? "bg-accent/20 text-accent border-accent/40" : "bg-panel/50 border-panel-border/50 text-muted-foreground hover:text-foreground"}`}>
                     <Keyboard size={10} /> KB
                   </button>
                   <button onClick={() => setGpEnabled(v => !v)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border transition-all cursor-pointer ${gpEnabled ? "bg-green-500/20 text-green-400 border-green-500/40" : "bg-panel/50 border-panel-border/50 text-muted-foreground"}`}>
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9.5px] font-bold border transition-all cursor-pointer ${gpEnabled ? "bg-green-500/20 text-green-400 border-green-500/40" : "bg-panel/50 border-panel-border/50 text-muted-foreground"}`}>
                     <Gamepad2 size={10} /> {gpEnabled ? "GP ON" : "GP OFF"}
                   </button>
                 </div>
@@ -1004,87 +1210,85 @@ function PilotControlsPage() {
               )}
 
               {!socket.telemetry?.armed && (
-                <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg px-2.5 py-1.5 text-[9px] font-semibold text-center">
+                <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg px-2.5 py-1 text-[9px] font-semibold text-center">
                   ⚠ DISARMED — Pixhawk will ignore all PWM until Armed
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-1.5">
+              {/* RC PWM Channel Gauges */}
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
                 {([{ label: "CH1 Lateral", v: channels[1] }, { label: "CH2 Forward", v: channels[2] }, { label: "CH3 Throttle", v: channels[3] }, { label: "CH4 Yaw", v: channels[4] }] as const).map(ch => (
-                  <div key={ch.label} className={`p-1.5 rounded-lg border transition-colors ${active(ch.v) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-black/10 border-panel-border/20"}`}>
-                    <div className="flex justify-between items-center mb-1 text-[8px] font-mono">
-                      <span className="text-muted-foreground">{ch.label}</span>
-                      <span className={`font-bold tabular-nums ${active(ch.v) ? "text-emerald-400" : "text-muted-foreground"}`}>{ch.v}</span>
+                  <div key={ch.label} className={`p-1.5 rounded-lg border transition-colors ${active(ch.v) ? "bg-emerald-500/10 border-emerald-500/30" : "bg-black/20 border-panel-border/30"}`}>
+                    <div className="flex justify-between items-center mb-1 text-[8.5px] font-mono">
+                      <span className="text-muted-foreground font-semibold">{ch.label}</span>
+                      <span className={`font-extrabold tabular-nums ${active(ch.v) ? "text-emerald-400" : "text-muted-foreground"}`}>{ch.v} <span className="text-[7.5px] text-muted-foreground">PWM</span></span>
                     </div>
-                    <div className="h-1.5 w-full bg-panel-border/30 rounded-full overflow-hidden relative">
-                      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/25 z-10" />
-                      <div className={`h-full rounded-full transition-all duration-75 ${active(ch.v) ? "bg-gradient-to-r from-emerald-500 to-cyan-400" : "bg-panel-border/60"}`} style={{ width: `${pct(ch.v)}%` }} />
+                    <div className="h-1.5 w-full bg-panel-border/40 rounded-full overflow-hidden relative">
+                      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/40 z-10" />
+                      <div className={`h-full rounded-full transition-all duration-75 ${active(ch.v) ? "bg-gradient-to-r from-emerald-500 to-cyan-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-panel-border/60"}`} style={{ width: `${pct(ch.v)}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
 
               <div className="flex items-center justify-between text-[8px] font-mono text-muted-foreground">
-                <span>Packets: <span className={socket.connected ? "text-emerald-400 font-bold" : "text-red-400"}>{emitCount}</span></span>
-                <span className={socket.connected ? "text-emerald-400" : "text-red-400"}>{socket.connected ? "● SOCKET OK" : "● NO SOCKET"}</span>
+                <span>Packets Sent: <span className={socket.connected ? "text-emerald-400 font-bold" : "text-red-400"}>{emitCount}</span></span>
+                <span className={socket.connected ? "text-emerald-400 font-bold" : "text-red-400"}>{socket.connected ? "● SOCKET LIVE" : "● NO SOCKET"}</span>
               </div>
-
-              {kbEnabled && !gpConn && (
-                <div className="grid grid-cols-2 gap-1 text-[8px] text-muted-foreground">
-                  <div className="flex items-center gap-1"><kbd className="bg-panel border border-panel-border rounded px-1 font-mono">W/S</kbd> Forward</div>
-                  <div className="flex items-center gap-1"><kbd className="bg-panel border border-panel-border rounded px-1 font-mono">A/D</kbd> Lateral</div>
-                  <div className="flex items-center gap-1"><kbd className="bg-panel border border-panel-border rounded px-1 font-mono">↑/↓</kbd> Throttle</div>
-                  <div className="flex items-center gap-1"><kbd className="bg-panel border border-panel-border rounded px-1 font-mono">←/→</kbd> Yaw</div>
-                </div>
-              )}
             </div>
-          </div>
 
-          <div className="border-t border-panel-border/40 pt-2.5 shrink-0">
-            <button onClick={socket.sendEmergencyStop}
-              className="w-full flex items-center justify-center gap-2 bg-[color:var(--color-danger)] text-white font-bold py-2 rounded-lg text-xs tracking-wider hover:opacity-90 cursor-pointer transition-opacity">
-              <Power size={13} /> KILL POWER / EMERGENCY STOP
-            </button>
-          </div>
-        </div>
-
-        {/* Col 3: Diagnostics */}
-        <div className="panel flex flex-col w-full lg:w-[280px] shrink-0 min-h-[380px] lg:h-full p-3 justify-between">
-          <div className="flex flex-col gap-2.5 flex-1">
-            <div className="border-b border-panel-border/60 pb-2 shrink-0"><span className="label-caps">Vessel Diagnostics</span></div>
-            <div className="space-y-2 text-xs">
-              {[{ label: "Vessel Depth", val: `${depth.toFixed(2)} m` }, { label: "Power Voltage", val: `${volt.toFixed(1)} V` }, { label: "Battery Capacity", val: `${batPct}%` }].map(r => (
-                <div key={r.label} className="flex justify-between items-center border-b border-panel-border/20 pb-1.5">
-                  <span className="label-caps">{r.label}</span>
-                  <span className="text-[color:var(--color-data)] font-bold font-mono">{r.val}</span>
-                </div>
-              ))}
-              <div className="flex justify-between items-center">
-                <span className="label-caps">MAVLink</span>
-                <span className={`font-bold font-mono flex items-center gap-1.5 ${socket.mavlinkConnected ? "text-[color:var(--color-success)]" : "text-red-500"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${socket.mavlinkConnected ? "bg-[color:var(--color-success)]" : "bg-red-500"}`} />
-                  {socket.mavlinkConnected ? "MAV_OK" : "NO_SYS_LINK"}
+            {/* Vessel Diagnostics & Safety System - Moved right into the center panel space */}
+            <div className="bg-gradient-to-b from-[oklch(0.14_0.028_250)] via-[oklch(0.12_0.024_250)] to-[oklch(0.10_0.02_250)] rounded-xl border border-cyan-500/30 p-3 space-y-2.5 shrink-0 shadow-md">
+              <div className="flex items-center justify-between border-b border-panel-border/50 pb-1.5">
+                <span className="label-caps font-bold text-cyan-300">Vessel Diagnostics &amp; Alarms</span>
+                <span className="text-[8.5px] font-mono text-muted-foreground">
+                  Safety System: <strong className={socket.connected ? "text-[color:var(--color-success)] font-bold" : "text-red-500 font-bold"}>{socket.connected ? "DIAG_ACTIVE" : "COM_ERROR"}</strong>
                 </span>
               </div>
-            </div>
 
-            <div className="bg-[oklch(0.15_0.028_250)] rounded-lg p-2.5 border border-panel-border/70 mt-1.5 flex flex-col gap-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2"><ShieldAlert className="text-red-500" size={15} /><span className="text-[11px] text-foreground font-semibold uppercase tracking-wide">Audio Depth Alarm</span></div>
-                <button onClick={() => setAlarmOn(v => !v)} className={`p-1.5 rounded-md border transition-colors cursor-pointer ${alarmOn ? "bg-red-500/20 text-red-400 border-red-500/40" : "bg-panel border-panel-border text-muted-foreground"}`}>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                {[{ label: "Vessel Depth", val: `${depth.toFixed(2)} m` }, { label: "Power Voltage", val: `${volt.toFixed(1)} V` }, { label: "Battery Capacity", val: `${batPct}%` }].map(r => (
+                  <div key={r.label} className="bg-panel/40 border border-panel-border/50 rounded-lg p-2 flex flex-col justify-between">
+                    <span className="label-caps text-[8.5px]">{r.label}</span>
+                    <span className="text-[color:var(--color-data)] font-bold font-mono text-sm mt-0.5">{r.val}</span>
+                  </div>
+                ))}
+                <div className="bg-panel/40 border border-panel-border/50 rounded-lg p-2 flex flex-col justify-between">
+                  <span className="label-caps text-[8.5px]">MAVLink</span>
+                  <span className={`font-bold font-mono text-xs mt-0.5 flex items-center gap-1.5 ${socket.mavlinkConnected ? "text-[color:var(--color-success)]" : "text-red-500"}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${socket.mavlinkConnected ? "bg-[color:var(--color-success)]" : "bg-red-500"}`} />
+                    {socket.mavlinkConnected ? "MAV_OK" : "NO_SYS_LINK"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Audio Depth Alarm Banner */}
+              <div className="bg-[oklch(0.16_0.03_250)] rounded-lg p-2.5 border border-panel-border/70 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="text-red-500 shrink-0" size={16} />
+                  <div>
+                    <div className="text-[11px] text-foreground font-bold uppercase tracking-wide">Audio Depth Alarm</div>
+                    <div className="text-[9.5px] text-muted-foreground">Triggers if depth exceeds <strong className="text-accent font-bold">1.8 meters</strong>.</div>
+                  </div>
+                </div>
+
+                <button onClick={() => setAlarmOn(v => !v)} className={`px-2.5 py-1.5 rounded-md border text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 ${alarmOn ? "bg-red-500/20 text-red-400 border-red-500/40" : "bg-panel border-panel-border text-muted-foreground"}`}>
                   {alarmOn ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                  <span>{alarmOn ? "ALARM ON" : "MUTED"}</span>
                 </button>
               </div>
-              <div className="text-[11px] text-muted-foreground leading-relaxed">Triggers if depth exceeds <strong className="text-accent font-bold">1.8 meters</strong>.</div>
+
               {depth > 1.8 && alarmOn && (
-                <div className="bg-red-500/10 border border-red-500/40 text-red-400 rounded-md p-2 text-center text-[10px] font-bold font-mono animate-pulse uppercase tracking-wider">⚠ ALARM ACTIVE: DANGER DEPTH</div>
+                <div className="bg-red-500/10 border border-red-500/40 text-red-400 rounded-md p-2 text-center text-[10px] font-bold font-mono animate-pulse uppercase tracking-wider">⚠ ALARM ACTIVE: DANGER DEPTH REACHED</div>
               )}
             </div>
           </div>
 
-          <div className="border-t border-panel-border/40 pt-2 shrink-0 font-mono text-[11px] text-muted-foreground flex justify-between">
-            <span>Safety System:</span>
-            <span className={socket.connected ? "text-[color:var(--color-success)]" : "text-red-500"}>{socket.connected ? "DIAG_ACTIVE" : "COM_ERROR"}</span>
+          <div className="border-t border-panel-border/40 pt-2 shrink-0">
+            <button onClick={socket.sendEmergencyStop}
+              className="w-full flex items-center justify-center gap-2 bg-[color:var(--color-danger)] text-white font-bold py-2.5 rounded-xl text-xs tracking-wider hover:opacity-90 cursor-pointer transition-all shadow-md active:scale-[0.99]">
+              <Power size={14} /> KILL POWER / EMERGENCY STOP
+            </button>
           </div>
         </div>
       </div>

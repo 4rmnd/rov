@@ -61,9 +61,10 @@ function NavigationPath() {
           <span className="label-caps">University</span>
           <span className="text-foreground">Politeknik Negeri Banyuwangi</span>
         </div>
-        <div className="text-right">
-          <div className="font-mono text-xs leading-none">{timeStr}</div>
-          <div className="text-[10px] text-muted-foreground mt-1">{dayName}, {dateStr}</div>
+        <div className="flex items-center gap-2 font-mono text-xs text-right">
+          <span className="text-muted-foreground text-[11px]">{dayName}, {dateStr}</span>
+          <span className="text-muted-foreground/40">•</span>
+          <span className="font-bold text-foreground">{timeStr}</span>
         </div>
       </header>
 
@@ -162,33 +163,45 @@ function NavigationPath() {
           </div>
         </div>
 
-        {/* Right Card: Trajectory Map */}
+        {/* Right Card: Tactical Trajectory Map */}
         <div className="panel flex flex-col flex-1 min-h-[380px] lg:h-full p-3 justify-between">
           <div className="flex items-center justify-between border-b border-panel-border/60 pb-2 shrink-0">
             <div className="flex items-center gap-2">
-              <Compass className="text-cyan-400 animate-spin-slow" size={16} />
-              <span className="label-caps font-bold">Tactical Path Plotter</span>
+              <div className="w-6 h-6 rounded-lg bg-cyan-500/15 border border-cyan-500/30 grid place-items-center">
+                <Compass className="text-cyan-400 animate-spin-slow" size={14} />
+              </div>
+              <div>
+                <span className="label-caps font-bold text-foreground">Tactical Path Plotter</span>
+                <span className="text-[9px] font-mono text-cyan-400/80 block -mt-0.5">SUBSEA RADAR TRAJECTORY TRACKING</span>
+              </div>
             </div>
             <button
               onClick={handleReset}
-              className="flex items-center gap-1.5 text-[11px] font-mono border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 px-2.5 py-1 rounded-lg hover:bg-cyan-500/20 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 text-[11px] font-mono font-bold border border-cyan-500/40 bg-cyan-500/15 text-cyan-300 px-3 py-1.5 rounded-xl hover:bg-cyan-500/25 transition-all cursor-pointer shadow-md active:scale-[0.98]"
             >
-              <RefreshCw size={11} />
+              <RefreshCw size={12} />
               <span>RESET ORIGIN</span>
             </button>
           </div>
 
-          {/* Tactical Path Plotter Canvas */}
-          <div className="flex-1 min-h-0 my-2.5 bg-gradient-to-b from-[oklch(0.12_0.03_250)] via-[oklch(0.14_0.032_250)] to-[oklch(0.10_0.025_250)] rounded-xl border border-cyan-500/30 relative overflow-hidden shadow-[inset_0_0_30px_rgba(6,182,212,0.08)]">
+          {/* Tactical Path Plotter Canvas - Modernized Radar HUD */}
+          <div className="flex-1 min-h-[260px] my-2.5 bg-gradient-to-b from-[oklch(0.12_0.032_250)] via-[oklch(0.14_0.035_250)] to-[oklch(0.09_0.024_250)] rounded-2xl border border-cyan-500/40 relative overflow-hidden shadow-[inset_0_0_35px_rgba(6,182,212,0.12)]">
             
+            {/* Submarine Tactical Corner Brackets */}
+            <div className="absolute top-2 left-2 text-[10px] font-mono text-cyan-500/50 pointer-events-none">┌</div>
+            <div className="absolute top-2 right-2 text-[10px] font-mono text-cyan-500/50 pointer-events-none">┐</div>
+            <div className="absolute bottom-2 left-2 text-[10px] font-mono text-cyan-500/50 pointer-events-none">└</div>
+            <div className="absolute bottom-2 right-2 text-[10px] font-mono text-cyan-500/50 pointer-events-none">┘</div>
+
             {/* Tactical Grid Background */}
-            <svg className="absolute inset-0 w-full h-full">
+            <svg className="absolute inset-0 w-full h-full opacity-40">
               <defs>
                 <pattern id="nav-grid" width="40" height="25" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 25" fill="none" stroke="rgba(6, 182, 212, 0.12)" strokeWidth="0.5" />
+                  <path d="M 40 0 L 0 0 0 25" fill="none" stroke="rgba(6, 182, 212, 0.18)" strokeWidth="0.5" />
                 </pattern>
                 <linearGradient id="path-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#06b6d4" />
+                  <stop offset="50%" stopColor="#38bdf8" />
                   <stop offset="100%" stopColor="#10b981" />
                 </linearGradient>
               </defs>
@@ -196,11 +209,11 @@ function NavigationPath() {
             </svg>
 
             {/* Tactical Overlay Info Badge (Top-Right) */}
-            <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md border border-cyan-500/30 rounded-lg px-2.5 py-1.5 font-mono text-[9.5px]">
+            <div className="absolute top-3 right-3 z-20 flex items-center gap-2 bg-slate-950/85 backdrop-blur-md border border-cyan-500/40 rounded-xl px-3 py-1.5 font-mono text-[9.5px] shadow-lg">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-              <span className="text-cyan-300 font-bold">TACTICAL RADAR</span>
+              <span className="text-cyan-300 font-extrabold tracking-wide">TACTICAL RADAR ACTIVE</span>
               <span className="text-muted-foreground">|</span>
-              <span className="text-slate-300">ORIGIN (0.0, 0.0)</span>
+              <span className="text-slate-300">ORIGIN: (0.0, 0.0)</span>
             </div>
 
             {/* Main SVG Tactical Plotter */}
@@ -210,8 +223,8 @@ function NavigationPath() {
                 const originX = 200;
                 const originY = 120;
 
-                // Radar Concentric Range Rings (1m, 2m, 3m)
-                const rings = [32, 64, 96];
+                // Radar Concentric Range Rings (1m, 2m, 3m, 4m)
+                const rings = [32, 64, 96, 128];
 
                 const pathPoints = points.map((p: any) => ({
                   x: originX + p.x * scale,
@@ -236,16 +249,17 @@ function NavigationPath() {
                           cy={originY}
                           r={r}
                           fill="none"
-                          stroke="rgba(6, 182, 212, 0.18)"
+                          stroke="rgba(6, 182, 212, 0.22)"
                           strokeWidth="1"
                           strokeDasharray="4 4"
                         />
                         <text
                           x={originX + r + 3}
                           y={originY - 3}
-                          fill="rgba(6, 182, 212, 0.5)"
-                          fontSize="7"
+                          fill="rgba(6, 182, 212, 0.6)"
+                          fontSize="7.5"
                           fontFamily="monospace"
+                          fontWeight="bold"
                         >
                           {(idx + 1)}m
                         </text>
@@ -253,18 +267,18 @@ function NavigationPath() {
                     ))}
 
                     {/* Crosshair Center Lines */}
-                    <line x1={originX} y1="10" x2={originX} y2="230" stroke="rgba(6, 182, 212, 0.25)" strokeWidth="1" strokeDasharray="2 2" />
-                    <line x1="20" y1={originY} x2="380" y2={originY} stroke="rgba(6, 182, 212, 0.25)" strokeWidth="1" strokeDasharray="2 2" />
+                    <line x1={originX} y1="10" x2={originX} y2="230" stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="3 3" />
+                    <line x1="20" y1={originY} x2="380" y2={originY} stroke="rgba(6, 182, 212, 0.3)" strokeWidth="1" strokeDasharray="3 3" />
 
-                    {/* Cardinal Markers */}
-                    <text x={originX} y="20" fill="rgba(6, 182, 212, 0.8)" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">N (+Y)</text>
-                    <text x={originX} y="232" fill="rgba(6, 182, 212, 0.8)" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">S (-Y)</text>
-                    <text x="370" y={originY + 3} fill="rgba(6, 182, 212, 0.8)" fontSize="9" fontWeight="bold" textAnchor="start" fontFamily="monospace">E (+X)</text>
-                    <text x="10" y={originY + 3} fill="rgba(6, 182, 212, 0.8)" fontSize="9" fontWeight="bold" textAnchor="start" fontFamily="monospace">W (-X)</text>
+                    {/* Cardinal Markers with Badges */}
+                    <text x={originX} y="18" fill="#06b6d4" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">N (+Y)</text>
+                    <text x={originX} y="234" fill="#06b6d4" fontSize="9" fontWeight="bold" textAnchor="middle" fontFamily="monospace">S (-Y)</text>
+                    <text x="375" y={originY + 3} fill="#06b6d4" fontSize="9" fontWeight="bold" textAnchor="start" fontFamily="monospace">E (+X)</text>
+                    <text x="5" y={originY + 3} fill="#06b6d4" fontSize="9" fontWeight="bold" textAnchor="start" fontFamily="monospace">W (-X)</text>
 
                     {/* Center Origin Reticle */}
-                    <circle cx={originX} cy={originY} r="4" fill="#06b6d4" opacity="0.8" />
-                    <circle cx={originX} cy={originY} r="8" fill="none" stroke="#06b6d4" strokeWidth="1" opacity="0.5" />
+                    <circle cx={originX} cy={originY} r="4" fill="#06b6d4" opacity="0.9" />
+                    <circle cx={originX} cy={originY} r="9" fill="none" stroke="#06b6d4" strokeWidth="1.5" opacity="0.6" />
 
                     {/* Trajectory Path Line */}
                     {pathD && (
@@ -275,13 +289,13 @@ function NavigationPath() {
                         strokeWidth="3.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className="drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]"
+                        className="drop-shadow-[0_0_12px_rgba(6,182,212,0.9)]"
                       />
                     )}
 
                     {/* Waypoint Dots */}
                     {pathPoints.slice(1, -1).map((pt, idx) => (
-                      <circle key={idx} cx={pt.x} cy={pt.y} r="2.5" fill="#38bdf8" opacity="0.7" />
+                      <circle key={idx} cx={pt.x} cy={pt.y} r="2.5" fill="#38bdf8" opacity="0.8" />
                     ))}
 
                     {/* Start 'S' Marker */}
@@ -302,15 +316,15 @@ function NavigationPath() {
                       </g>
                     )}
 
-                    {/* Current ROV Position Marker (E / Active Icon) */}
+                    {/* Current ROV Position Marker (E / Active Beacon Icon) */}
                     <g>
-                      <circle cx={endPt.x} cy={endPt.y} r="14" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" strokeWidth="2" className="animate-ping" />
+                      <circle cx={endPt.x} cy={endPt.y} r="15" fill="rgba(16, 185, 129, 0.25)" stroke="#10b981" strokeWidth="2" className="animate-ping" />
                       <circle cx={endPt.x} cy={endPt.y} r="11" fill="#020617" stroke="#10b981" strokeWidth="2.5" />
                       <text
                         x={endPt.x}
                         y={endPt.y + 3.5}
                         fill="#10b981"
-                        fontSize="10"
+                        fontSize="9.5"
                         fontWeight="900"
                         textAnchor="middle"
                         fontFamily="monospace"
@@ -324,23 +338,23 @@ function NavigationPath() {
             </svg>
           </div>
 
-          {/* Coordinate Readout Grid */}
+          {/* Coordinate Readout Grid - Futuristic Glassmorphic Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs shrink-0">
-            <div className="bg-panel border border-panel-border rounded-md px-2.5 py-2">
-              <div className="text-[10px] text-muted-foreground tracking-wide">X POS</div>
-              <div className="text-[color:var(--color-data)] font-bold font-mono">{currentX.toFixed(3)} m</div>
+            <div className="bg-gradient-to-b from-[oklch(0.13_0.026_250)] to-[oklch(0.10_0.02_250)] border border-cyan-500/30 rounded-xl p-2.5 shadow-sm">
+              <div className="text-[9px] text-cyan-300/80 font-bold uppercase tracking-wider mb-0.5">X POS</div>
+              <div className="text-cyan-300 font-extrabold font-mono text-sm tabular-nums">{currentX.toFixed(3)} <span className="text-[9px] text-muted-foreground font-normal">m</span></div>
             </div>
-            <div className="bg-panel border border-panel-border rounded-md px-2.5 py-2">
-              <div className="text-[10px] text-muted-foreground tracking-wide">Y POS</div>
-              <div className="text-[color:var(--color-data)] font-bold font-mono">{currentY.toFixed(3)} m</div>
+            <div className="bg-gradient-to-b from-[oklch(0.13_0.026_250)] to-[oklch(0.10_0.02_250)] border border-cyan-500/30 rounded-xl p-2.5 shadow-sm">
+              <div className="text-[9px] text-cyan-300/80 font-bold uppercase tracking-wider mb-0.5">Y POS</div>
+              <div className="text-cyan-300 font-extrabold font-mono text-sm tabular-nums">{currentY.toFixed(3)} <span className="text-[9px] text-muted-foreground font-normal">m</span></div>
             </div>
-            <div className="bg-panel border border-panel-border rounded-md px-2.5 py-2">
-              <div className="text-[10px] text-muted-foreground tracking-wide">Z DEPTH</div>
-              <div className="text-[color:var(--color-data)] font-bold font-mono">{currentZ.toFixed(3)} m</div>
+            <div className="bg-gradient-to-b from-[oklch(0.13_0.026_250)] to-[oklch(0.10_0.02_250)] border border-cyan-500/30 rounded-xl p-2.5 shadow-sm">
+              <div className="text-[9px] text-cyan-300/80 font-bold uppercase tracking-wider mb-0.5">Z DEPTH</div>
+              <div className="text-cyan-300 font-extrabold font-mono text-sm tabular-nums">{currentZ.toFixed(3)} <span className="text-[9px] text-muted-foreground font-normal">m</span></div>
             </div>
-            <div className="bg-panel border border-panel-border rounded-md px-2.5 py-2">
-              <div className="text-[10px] text-muted-foreground tracking-wide">LOGGED NODES</div>
-              <div className="text-[color:var(--color-data)] font-bold font-mono">{points.length}</div>
+            <div className="bg-gradient-to-b from-[oklch(0.13_0.026_250)] to-[oklch(0.10_0.02_250)] border border-emerald-500/30 rounded-xl p-2.5 shadow-sm">
+              <div className="text-[9px] text-emerald-300/80 font-bold uppercase tracking-wider mb-0.5">LOGGED NODES</div>
+              <div className="text-emerald-300 font-extrabold font-mono text-sm tabular-nums">{points.length} <span className="text-[9px] text-muted-foreground font-normal">pts</span></div>
             </div>
           </div>
         </div>

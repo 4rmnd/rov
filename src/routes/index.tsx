@@ -33,6 +33,7 @@ function useClock() {
 
 function Dashboard() {
   const now = useClock();
+  const dayName = now.toLocaleDateString("en-GB", { weekday: "long" });
   const date = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   const time = now.toLocaleTimeString("en-GB", { hour12: false });
 
@@ -108,7 +109,7 @@ function Dashboard() {
         )}
 
         {/* Header + Status Bar (combined into one row to save vertical space) */}
-        <div className="h-12 shrink-0 border-b border-panel-border px-4 bg-[color:var(--color-sidebar)] flex items-center justify-between gap-3 overflow-x-auto">
+        <header className="h-12 shrink-0 border-b border-panel-border px-4 bg-[color:var(--color-sidebar)] flex items-center justify-between gap-3">
           <div className="flex items-center divide-x divide-panel-border shrink-0">
             <div className="pr-3">
               <StatusRow
@@ -150,9 +151,10 @@ function Dashboard() {
               <span className="label-caps">Team</span>
               <span className="font-mono font-semibold">Ocean Explorer</span>
             </div>
-            <div className="text-right">
-              <div className="font-mono text-xs leading-none">{time}</div>
-              <div className="text-[10px] text-muted-foreground mt-1">{date}</div>
+            <div className="flex items-center gap-2 font-mono text-xs text-right">
+              <span className="text-muted-foreground text-[11px]">{dayName}, {date}</span>
+              <span className="text-muted-foreground/40">•</span>
+              <span className="font-bold text-foreground">{time}</span>
             </div>
           </div>
 
@@ -162,7 +164,7 @@ function Dashboard() {
           >
             <Power size={12} className="shrink-0" /> EMERGENCY STOP
           </button>
-        </div>
+        </header>
 
         {/* Content */}
         <main className="flex-1 min-h-0 p-2.5 grid gap-2.5 grid-cols-1 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_340px] overflow-hidden">

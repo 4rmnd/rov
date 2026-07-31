@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
-import { LayoutDashboard, Video, Compass, Sliders, ChevronLeft, ChevronRight, Anchor } from "lucide-react";
+import { LayoutDashboard, Video, Compass, Sliders, ChevronLeft, ChevronRight } from "lucide-react";
 import poliwangiLogo from "../assets/Logo Poliwangi HD.png";
 
 export function Sidebar() {
@@ -41,25 +41,45 @@ export function Sidebar() {
       }`}
     >
       <div className="flex flex-col min-h-0">
-        {/* Sidebar Header */}
-        <div className="min-h-12 border-b border-[color:var(--hairline)] flex items-center px-4 py-2.5 gap-2.5 shrink-0">
-          <div className="relative w-8 h-8 rounded-lg bg-[color:var(--surface)] border border-[color:var(--hairline)] flex items-center justify-center shrink-0">
-            <img src={poliwangiLogo} alt="Poliwangi" className="w-6 h-6 object-contain" />
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col min-w-0 animate-fade-in">
-              <span className="font-bold text-xs tracking-wide uppercase text-[color:var(--ink)] leading-none truncate">
-                ROV Dashboard
-              </span>
-              <span className="text-[10px] text-[color:var(--mute)] tracking-wide mt-1 leading-snug">
-                Politeknik Negeri Banyuwangi
-              </span>
+        {/* Sidebar Header & Integrated Toggle */}
+        <div
+          onClick={() => setCollapsed(!collapsed)}
+          className={`h-12 border-b border-[color:var(--hairline)] flex items-center shrink-0 cursor-pointer group/header hover:bg-[color:var(--surface-card)]/50 transition-colors select-none ${
+            collapsed ? "justify-center px-0" : "px-3.5 justify-between"
+          }`}
+          title={collapsed ? "Klik untuk Expand Sidebar" : "Klik untuk Collapse Sidebar"}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Logo Box with Hover Icon Morph */}
+            <div className="relative w-8 h-8 rounded-lg bg-[color:var(--surface)] border border-[color:var(--hairline)] flex items-center justify-center shrink-0 overflow-hidden group-hover/header:border-[color:var(--hairline-strong)] transition-all shadow-sm">
+              {/* Poliwangi Logo */}
+              <img
+                src={poliwangiLogo}
+                alt="Poliwangi"
+                className="w-6 h-6 object-contain transition-all duration-200 group-hover/header:opacity-0 group-hover/header:scale-75"
+              />
+
+              {/* Hover Morph Toggle Icon */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/header:opacity-100 transition-all duration-200 text-cyan-400 bg-slate-900/90 font-bold">
+                {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+              </div>
             </div>
-          )}
+
+            {!collapsed && (
+              <div className="flex flex-col min-w-0 animate-fade-in">
+                <span className="font-bold text-xs tracking-wide uppercase text-[color:var(--ink)] leading-none truncate">
+                  ROV Dashboard
+                </span>
+                <span className="text-[10px] text-[color:var(--mute)] tracking-wide mt-1 leading-snug">
+                  Politeknik Negeri Banyuwangi
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Menu Navigation */}
-        <nav className="p-2.5 space-y-1 flex-1 overflow-y-auto">
+        <nav className={`py-2.5 flex-1 overflow-y-auto ${collapsed ? "px-1.5 space-y-1.5" : "px-2.5 space-y-1"}`}>
           {menuItems.map((item) => {
             const isActive = location.pathname === item.to;
             const Icon = item.icon;
@@ -68,13 +88,21 @@ export function Sidebar() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all group ${
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center rounded-lg transition-all group ${
+                  collapsed ? "justify-center h-10 w-full px-0" : "gap-2.5 px-3 py-2.5"
+                } ${
                   isActive
                     ? "bg-[color:var(--surface-card)] text-white border border-[color:var(--hairline-strong)]"
                     : "text-[color:var(--body)] hover:bg-[color:var(--surface-card)]/60 hover:text-white border border-transparent"
                 }`}
               >
-                <Icon size={16} className={`shrink-0 transition-transform group-hover:scale-105 ${isActive ? "text-[color:var(--accent-blue)]" : ""}`} />
+                <Icon
+                  size={18}
+                  className={`shrink-0 transition-transform group-hover:scale-105 ${
+                    isActive ? "text-[color:var(--accent-blue)]" : ""
+                  }`}
+                />
                 {!collapsed && (
                   <div className="flex flex-col min-w-0">
                     <span className="text-xs font-semibold leading-none">{item.label}</span>
@@ -87,23 +115,6 @@ export function Sidebar() {
             );
           })}
         </nav>
-      </div>
-
-      {/* Footer Info & Collapse Toggle */}
-      <div className="p-2.5 border-t border-[color:var(--hairline)] flex flex-col gap-2 bg-[color:var(--surface)]">
-        {!collapsed && (
-          <div className="flex items-center gap-2 text-[11px] text-[color:var(--mute)] px-1 py-0.5">
-            <Anchor size={11} className="text-[color:var(--accent-blue)]" />
-            <span className="truncate leading-none">Vessel Online</span>
-          </div>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full h-8 flex items-center justify-center rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface-card)] hover:bg-white hover:text-black hover:border-white text-[color:var(--mute)] hover:cursor-pointer transition-colors"
-          title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-        >
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
       </div>
     </aside>
   );

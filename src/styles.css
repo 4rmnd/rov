@@ -130,3 +130,20 @@
   50% { opacity: 1; }
 }
 
+/* Custom Dark Subsea Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(7, 8, 10, 0.7);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(6, 182, 212, 0.35);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.7);
+}
+

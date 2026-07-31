@@ -78,6 +78,14 @@ function loadLS<T>(key: string, fallback: T): T {
   }
 }
 
+function saveLS(key: string, val: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface TelemetryState {
   roll: number;
   pitch: number;
@@ -375,6 +383,20 @@ function initSingletonSocket() {
   sharedSocket.on("connect", () => {
     sharedState.connected = true;
     notifyListeners();
+
+    // Sync global mapping configuration from Core API server if available
+    fetch(`${ROV_URL}/api/gamepad/mapping`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.axis) saveLS(LS_AXIS, data.axis);
+        if (data?.btn) saveLS(LS_BTN, data.btn);
+      })
+      .catch(() => {});
+  });
+
+  sharedSocket.on("gamepad_mapping_updated", (data: { axis?: any; btn?: any }) => {
+    if (data?.axis) saveLS(LS_AXIS, data.axis);
+    if (data?.btn) saveLS(LS_BTN, data.btn);
   });
 
   sharedSocket.on("disconnect", () => {
@@ -504,6 +526,17 @@ export function useROVSocket() {
   const sendRCOverride = (channels: Record<number, number>) =>
     sharedSocket?.emit("cmd_rc_override", { channels });
 
+  const sendSaveMapping = (axis: any, btn: any) => {
+    saveLS(LS_AXIS, axis);
+    saveLS(LS_BTN, btn);
+    fetch(`${ROV_URL}/api/gamepad/mapping`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ axis, btn }),
+    }).catch(() => {});
+    sharedSocket?.emit("cmd_save_gamepad_mapping", { axis, btn });
+  };
+
   return {
     ...state,
     sendEmergencyStop,
@@ -516,5 +549,6 @@ export function useROVSocket() {
     sendAutonomousStart,
     sendAutonomousStop,
     sendRCOverride,
+    sendSaveMapping,
   };
 }
