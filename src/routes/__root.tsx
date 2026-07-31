@@ -10,6 +10,11 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import faviconIco from "../assets/icon/favicon.ico?url";
+import favicon32 from "../assets/icon/favicon-32x32.png?url";
+import favicon16 from "../assets/icon/favicon-16x16.png?url";
+import appleTouchIcon from "../assets/icon/apple-touch-icon.png?url";
+import manifestUrl from "../assets/icon/site.webmanifest?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Sidebar } from "../components/Sidebar";
 import { GlobalGamepadController } from "../components/GlobalGamepadController";
@@ -68,6 +73,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: faviconIco },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: favicon32 },
+      { rel: "icon", type: "image/png", sizes: "16x16", href: favicon16 },
+      { rel: "apple-touch-icon", sizes: "180x180", href: appleTouchIcon },
+      { rel: "manifest", href: manifestUrl },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
