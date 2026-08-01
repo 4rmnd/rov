@@ -442,6 +442,11 @@ function initSingletonSocket() {
     notifyListeners();
   });
 
+  sharedSocket.on("camera_command_result", (data: CameraResult) => {
+    sharedState.lastCameraResult = data;
+    notifyListeners();
+  });
+
   sharedSocket.on("autonomous_status", (data: AutonomousStatus) => {
     sharedState.autonomousStatus = data;
     notifyListeners();
