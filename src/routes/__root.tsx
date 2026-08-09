@@ -64,11 +64,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "ROV Dashboard — Ocean Explorer" },
+      { title: "ROV Dashboard — POLIWANGI HYDROMODELLING CLUB 4" },
       {
         name: "description",
         content:
-          "ROV monitoring & control dashboard — Ocean Explorer, Politeknik Negeri Banyuwangi (KKI 2026).",
+          "ROV monitoring & control dashboard — POLIWANGI HYDROMODELLING CLUB 4, Politeknik Negeri Banyuwangi (KKI 2026).",
       },
     ],
     links: [

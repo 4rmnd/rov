@@ -10,7 +10,7 @@ import { sendCameraCommand } from "../lib/camera-api";
 export const Route = createFileRoute("/vision")({
   head: () => ({
     meta: [
-      { title: "ROV Vision Center — Ocean Explorer" },
+      { title: "ROV Vision Center — POLIWANGI HYDROMODELLING CLUB 4" },
       { name: "description", content: "Cockpit HUD dual camera feed and high-fidelity QR docking analyzer." },
     ],
   }),
@@ -115,7 +115,7 @@ function VisionCenter() {
       <header className="h-12 shrink-0 border-b border-panel-border px-4 flex items-center justify-between bg-[color:var(--color-sidebar)] gap-3">
         <div className="flex items-center gap-2 text-xs">
           <span className="label-caps">Team</span>
-          <span className="font-mono font-semibold">{socket.connected ? "Ocean Explorer" : "Offline Mode"}</span>
+          <span className="font-mono font-semibold">{socket.connected ? "POLIWANGI HYDROMODELLING CLUB 4" : "Offline Mode"}</span>
         </div>
         <div className="hidden md:flex items-center gap-2 text-xs">
           <span className="label-caps">University</span>
@@ -279,7 +279,7 @@ function VisionCenter() {
 
         <div className="font-mono text-[11px] text-muted-foreground hidden md:flex items-center gap-4">
           <span>Cam Service: Port 8001/8002</span>
-          <span>Ocean Explorer v1.0.0</span>
+          <span>POLIWANGI HYDROMODELLING CLUB 4 v1.0.0</span>
         </div>
       </footer>
     </div>

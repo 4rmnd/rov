@@ -7,7 +7,7 @@ import { useROVSocket } from "../hooks/useROVSocket";
 export const Route = createFileRoute("/navigation")({
   head: () => ({
     meta: [
-      { title: "ROV Navigation Center — Ocean Explorer" },
+      { title: "ROV Navigation Center — POLIWANGI HYDROMODELLING CLUB 4" },
       { name: "description", content: "Radar trajectory track plotting and aviation-grade depth tape HUD." },
     ],
   }),
@@ -55,7 +55,7 @@ function NavigationPath() {
       <header className="h-12 shrink-0 border-b border-panel-border px-4 flex items-center justify-between bg-[color:var(--color-sidebar)] gap-3">
         <div className="flex items-center gap-2 text-xs">
           <span className="label-caps">Team</span>
-          <span className="font-mono font-semibold">Ocean Explorer</span>
+          <span className="font-mono font-semibold">POLIWANGI HYDROMODELLING CLUB 4</span>
         </div>
         <div className="hidden md:flex items-center gap-2 text-xs">
           <span className="label-caps">University</span>

@@ -15,8 +15,8 @@ import { sendCameraCommand } from "../lib/camera-api";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "ROV Dashboard — Ocean Explorer" },
-      { name: "description", content: "Live ROV telemetry, camera, trajectory & control dashboard for Ocean Explorer KKI 2026." },
+      { title: "ROV Dashboard — POLIWANGI HYDROMODELLING CLUB 4" },
+      { name: "description", content: "Live ROV telemetry, camera, trajectory & control dashboard for POLIWANGI HYDROMODELLING CLUB 4 KKI 2026." },
     ],
   }),
   component: Dashboard,
@@ -149,7 +149,7 @@ function Dashboard() {
           <div className="hidden xl:flex items-center gap-3 text-xs shrink-0">
             <div className="flex items-center gap-1.5">
               <span className="label-caps">Team</span>
-              <span className="font-mono font-semibold">Ocean Explorer</span>
+              <span className="font-mono font-semibold">POLIWANGI HYDROMODELLING CLUB 4</span>
             </div>
             <div className="flex items-center gap-2 font-mono text-xs text-right">
               <span className="text-muted-foreground text-[11px]">{dayName}, {date}</span>
@@ -234,7 +234,7 @@ function Dashboard() {
         </main>
 
         <footer className="shrink-0 border-t border-panel-border px-6 py-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>© 2026 Ocean Explorer · Politeknik Negeri Banyuwangi</span>
+          <span>© 2026 POLIWANGI HYDROMODELLING CLUB 4 · Politeknik Negeri Banyuwangi</span>
           <span className="font-mono">v1.0.0</span>
         </footer>
     </div>

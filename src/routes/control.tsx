@@ -11,7 +11,7 @@ import { useROVSocket } from "../hooks/useROVSocket";
 export const Route = createFileRoute("/control")({
   head: () => ({
     meta: [
-      { title: "ROV Pilot Controls Center — Ocean Explorer" },
+      { title: "ROV Pilot Controls Center — POLIWANGI HYDROMODELLING CLUB 4" },
       { name: "description", content: "HUD cockpit controls, flight orientation instruments, and subsea alarms." },
     ],
   }),
@@ -926,7 +926,7 @@ function PilotControlsPage() {
       {/* Header */}
       <header className="h-12 shrink-0 border-b border-panel-border px-4 flex items-center justify-between bg-[color:var(--color-sidebar)] gap-3">
         <div className="flex items-center gap-2 text-xs">
-          <span className="label-caps">Team</span><span className="font-mono font-semibold">Ocean Explorer</span>
+          <span className="label-caps">Team</span><span className="font-mono font-semibold">POLIWANGI HYDROMODELLING CLUB 4</span>
         </div>
         <div className="hidden md:flex items-center gap-2 text-xs">
           <span className="label-caps">University</span><span>Politeknik Negeri Banyuwangi</span>
