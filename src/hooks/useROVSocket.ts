@@ -383,20 +383,6 @@ function initSingletonSocket() {
   sharedSocket.on("connect", () => {
     sharedState.connected = true;
     notifyListeners();
-
-    // Sync global mapping configuration from Core API server if available
-    fetch(`${ROV_URL}/api/gamepad/mapping`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.axis) saveLS(LS_AXIS, data.axis);
-        if (data?.btn) saveLS(LS_BTN, data.btn);
-      })
-      .catch(() => {});
-  });
-
-  sharedSocket.on("gamepad_mapping_updated", (data: { axis?: any; btn?: any }) => {
-    if (data?.axis) saveLS(LS_AXIS, data.axis);
-    if (data?.btn) saveLS(LS_BTN, data.btn);
   });
 
   sharedSocket.on("disconnect", () => {
@@ -469,6 +455,14 @@ function initSingletonSocket() {
     notifyListeners();
   });
 
+  sharedSocket.on("mission_complete", (data: { success: boolean; reason: string }) => {
+    console.log(`[Autonomous Mission] ${data.success ? 'Success' : 'Failed'}: ${data.reason}`);
+    if (sharedState.autonomousStatus) {
+      sharedState.autonomousStatus.state = data.success ? "COMPLETE" : "FAILED";
+    }
+    notifyListeners();
+  });
+
   // Latency Ping-Pong
   setInterval(() => {
     if (sharedSocket?.connected) {
@@ -529,12 +523,6 @@ export function useROVSocket() {
   const sendSaveMapping = (axis: any, btn: any) => {
     saveLS(LS_AXIS, axis);
     saveLS(LS_BTN, btn);
-    fetch(`${ROV_URL}/api/gamepad/mapping`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ axis, btn }),
-    }).catch(() => {});
-    sharedSocket?.emit("cmd_save_gamepad_mapping", { axis, btn });
   };
 
   return {

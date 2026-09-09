@@ -69,12 +69,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/control' | '/gamepad-test' | '/navigation' | '/vision'
   id:
-    | '__root__'
-    | '/'
-    | '/control'
-    | '/gamepad-test'
-    | '/navigation'
-    | '/vision'
+    '__root__' | '/' | '/control' | '/gamepad-test' | '/navigation' | '/vision'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {

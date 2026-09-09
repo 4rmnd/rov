@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { Video, ImageIcon, Maximize2, Minimize2, Wifi, Radio, Power, ScanLine } from "lucide-react";
+import { Video, ImageIcon, Maximize2, Minimize2, Wifi, Radio, Power, ScanLine, QrCode } from "lucide-react";
 import qrCodeImage from "../assets/qr.jpeg";
 
 import { useROVSocket } from "../hooks/useROVSocket";
@@ -302,6 +302,8 @@ function CameraCard({
   telemetry: any;
 }) {
   const [isRecording, setIsRecording] = useState(false);
+  const [isVisionActive, setIsVisionActive] = useState(false);
+  const [isQrActive, setIsQrActive] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -368,6 +370,30 @@ function CameraCard({
       }
     } catch (e: any) {
       setStatusMessage("Record failed");
+      console.error(e);
+    }
+  };
+
+  const handleToggleVision = async () => {
+    try {
+      const action = isVisionActive ? "vision_deactivate" : "vision_activate";
+      setStatusMessage(isVisionActive ? "Deactivating object detection..." : "Activating object detection...");
+      await sendCameraCommand(cameraKey, action);
+      setIsVisionActive(!isVisionActive);
+    } catch (e: any) {
+      setStatusMessage("Object detection toggle failed");
+      console.error(e);
+    }
+  };
+
+  const handleToggleQr = async () => {
+    try {
+      const action = isQrActive ? "qr_deactivate" : "qr_activate";
+      setStatusMessage(isQrActive ? "Deactivating QR code..." : "Activating QR code...");
+      await sendCameraCommand(cameraKey, action);
+      setIsQrActive(!isQrActive);
+    } catch (e: any) {
+      setStatusMessage("QR toggle failed");
       console.error(e);
     }
   };
@@ -441,6 +467,22 @@ function CameraCard({
             className="w-8 h-8 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors cursor-pointer"
           >
             <ImageIcon size={14} />
+          </button>
+          {cameraKey === "front" && (
+            <button
+              onClick={handleToggleVision}
+              title={isVisionActive ? "Deactivate Object Detection" : "Activate Object Detection"}
+              className={`w-8 h-8 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors cursor-pointer ${isVisionActive ? "text-green-400" : ""}`}
+            >
+              <ScanLine size={14} />
+            </button>
+          )}
+          <button
+            onClick={handleToggleQr}
+            title={isQrActive ? "Deactivate QR Code Detection" : "Activate QR Code Detection"}
+            className={`w-8 h-8 grid place-items-center rounded-md bg-black/50 hover:bg-accent hover:text-[color:var(--color-accent-foreground)] text-white/80 transition-colors cursor-pointer ${isQrActive ? "text-green-400" : ""}`}
+          >
+            <QrCode size={14} />
           </button>
           <button
             onClick={handleToggleRecord}

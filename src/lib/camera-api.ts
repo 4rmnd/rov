@@ -1,7 +1,7 @@
 const ROV_URL = import.meta.env.VITE_ROV_URL ?? "http://localhost:8000";
 
 export type CameraId = "front" | "bottom";
-export type CameraAction = "screenshot" | "record_start" | "record_stop";
+export type CameraAction = "screenshot" | "record_start" | "record_stop" | "vision_activate" | "vision_deactivate" | "qr_activate" | "qr_deactivate";
 
 export async function sendCameraCommand(camera: CameraId, action: CameraAction) {
   let subPath = "";
@@ -11,6 +11,14 @@ export async function sendCameraCommand(camera: CameraId, action: CameraAction) 
     subPath = "record/start";
   } else if (action === "record_stop") {
     subPath = "record/stop";
+  } else if (action === "vision_activate") {
+    subPath = "vision/activate";
+  } else if (action === "vision_deactivate") {
+    subPath = "vision/deactivate";
+  } else if (action === "qr_activate") {
+    subPath = "qr/activate";
+  } else if (action === "qr_deactivate") {
+    subPath = "qr/deactivate";
   }
 
   const res = await fetch(`${ROV_URL}/api/camera/${camera}/${subPath}`, {
