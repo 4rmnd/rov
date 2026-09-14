@@ -3,17 +3,8 @@ import { io, Socket } from "socket.io-client";
 
 const ROV_URL = import.meta.env.VITE_ROV_URL ?? "http://localhost:8000";
 
-const LS_AXIS = "rov_axis_mapping_v6";
-const LS_BTN = "rov_btn_mapping_v2";
 
-// Aggressively clear ALL legacy cached axis mappings
-try {
-  if (typeof localStorage !== "undefined") {
-    ["v1", "v2", "v3", "v4", "v5"].forEach(v => localStorage.removeItem(`rov_axis_mapping_${v}`));
-  }
-} catch (e) { /* ignore */ }
-
-const DEFAULT_AXIS_MAPPING = {
+export const DEFAULT_AXIS_MAPPING = {
   // Gamepad API Standard: Axis 0=LS_X, Axis 1=LS_Y, Axis 2=RS_X, Axis 3=RS_Y
   forward: { axisIdx: 1, invert: true },   // Left Stick Y  (Up = Maju, Down = Mundur)
   yaw:     { axisIdx: 0, invert: false },  // Left Stick X  (Right = Belok Kanan, Left = Belok Kiri)
@@ -28,12 +19,19 @@ export type ROVAction =
   | "set_target" | "autonomous_start" | "autonomous_stop"
   | "emergency_stop";
 
-const DEFAULT_BUTTON_MAPPING: Record<number, ROVAction> = {
+export const DEFAULT_BUTTON_MAPPING: Record<number, ROVAction> = {
   0: "mode_toggle", // Triangle △
   1: "gripper_toggle", // Circle ○
   2: "arm_toggle", // Cross ×
   3: "light_toggle", // Square □
   9: "emergency_stop", // Start
+};
+
+export const DEFAULT_CALIB = {
+  forward: 1.0,
+  yaw: 1.0,
+  throttle: 1.0,
+  lateral: 1.0,
 };
 
 const DEADZONE = 0.1;
@@ -48,43 +46,7 @@ function axisPWM(v: number, invert = false) {
   return Math.round(1500 + applyDZ(invert ? -v : v) * PWM_RANGE);
 }
 
-function parsePOVHat(pov: number) {
-  if (pov === 0 || pov > 1.05 || (pov > 0.82 && pov < 0.98)) {
-    return { up: false, down: false, left: false, right: false };
-  }
-  const isUp = pov <= -0.85 || (pov >= 0.85 && pov <= 1.05);
-  const isDown = pov >= 0.02 && pov <= 0.28;
-  const isRight = pov >= -0.58 && pov <= -0.28;
-  const isLeft = pov >= 0.58 && pov <= 0.82;
-
-  const isUpRight = pov >= -0.84 && pov <= -0.59;
-  const isDownRight = pov >= -0.27 && pov <= -0.01;
-  const isDownLeft = pov >= 0.29 && pov <= 0.57;
-
-  return {
-    up: isUp || isUpRight,
-    down: isDown || isDownRight || isDownLeft,
-    left: isLeft || isDownLeft,
-    right: isRight || isUpRight || isDownRight,
-  };
-}
-
-function loadLS<T>(key: string, fallback: T): T {
-  try {
-    const r = localStorage.getItem(key);
-    return r ? { ...fallback, ...JSON.parse(r) } : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveLS(key: string, val: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch {
-    /* ignore */
-  }
-}
+// parsePOVHat removed to prevent axis-to-button ghosting
 
 export interface TelemetryState {
   roll: number;
@@ -180,10 +142,18 @@ export interface ROVSocketState {
   failsafeStatus: FailsafeStatus | null;
   lightState: boolean;
   gripperState: boolean;
+  config: any | null;
+  gpEnabled: boolean;
+  kbEnabled: boolean;
+  gpName: string | null;
+  channels: Record<number, number>;
+  emitCount: number;
 }
 
 // ─── SINGLETON INSTANCE & STATE MANAGEMENT ─────────────────────────────────────
-let sharedSocket: Socket | null = null;
+const globalAny = (typeof globalThis !== 'undefined' ? globalThis : window) as any;
+
+let sharedSocket: Socket | null = globalAny.__rovSharedSocket || null;
 let sharedState: ROVSocketState = {
   connected: false,
   mavlinkConnected: false,
@@ -197,7 +167,16 @@ let sharedState: ROVSocketState = {
   failsafeStatus: null,
   lightState: false,
   gripperState: false,
+  config: null,
+  gpEnabled: true,
+  kbEnabled: false,
+  gpName: null,
+  channels: { 1: 1500, 2: 1500, 3: 1500, 4: 1500, 5: 1500, 6: 1500 },
+  emitCount: 0,
 };
+
+const keys: Record<string, boolean> = {};
+let kbListenersAdded = false;
 
 const listeners = new Set<(s: ROVSocketState) => void>();
 
@@ -205,101 +184,91 @@ function notifyListeners() {
   listeners.forEach((fn) => fn({ ...sharedState }));
 }
 
-let gamepadLoopStarted = false;
+let gamepadLoopStarted = globalAny.__rovGamepadLoopStarted || false;
 
 function initGlobalGamepadLoop() {
   if (gamepadLoopStarted) return;
   gamepadLoopStarted = true;
+  globalAny.__rovGamepadLoopStarted = true;
 
   let gpIdx: number | null = null;
   let prevBtns: boolean[] = [];
-  let lightState = false;
-  let gripperState = false;
 
   if (typeof window !== "undefined") {
     window.addEventListener("gamepadconnected", (e: GamepadEvent) => {
       gpIdx = e.gamepad.index;
+      sharedState.gpName = e.gamepad.id;
+      notifyListeners();
     });
     window.addEventListener("gamepaddisconnected", (e: GamepadEvent) => {
-      if (gpIdx === e.gamepad.index) gpIdx = null;
+      if (gpIdx === e.gamepad.index) {
+        gpIdx = null;
+        sharedState.gpName = null;
+        notifyListeners();
+      }
     });
+
+    if (!kbListenersAdded) {
+      const KEYS = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
+      window.addEventListener("keydown", (e: KeyboardEvent) => {
+        const k = e.key.toLowerCase();
+        if (KEYS.includes(k)) { if (k.startsWith("arrow")) e.preventDefault(); keys[k] = true; }
+      });
+      window.addEventListener("keyup", (e: KeyboardEvent) => {
+        keys[e.key.toLowerCase()] = false;
+      });
+      kbListenersAdded = true;
+    }
   }
 
-  setInterval(() => {
+  if (globalAny.__rovGamepadInterval) {
+    clearInterval(globalAny.__rovGamepadInterval);
+  }
+
+  globalAny.__rovGamepadInterval = setInterval(() => {
     if (!sharedSocket || !sharedSocket.connected) return;
+
+    const currentConfig = sharedState.config || {};
+    const am = currentConfig.axisMap ?? DEFAULT_AXIS_MAPPING;
+    const bm = currentConfig.btnMap ?? DEFAULT_BUTTON_MAPPING;
+    const calib = currentConfig.calib ?? DEFAULT_CALIB;
+
+    let ch: Record<number, number> = { 1: 1500, 2: 1500, 3: 1500, 4: 1500, 5: 1500, 6: 1500 };
+    const btns: boolean[] = Array.from({ length: 30 }, () => false);
 
     const pads = typeof navigator !== "undefined" ? (navigator.getGamepads?.() ?? []) : [];
     if (gpIdx === null || !pads[gpIdx]) {
       for (let i = 0; i < pads.length; i++) {
         if (pads[i]) {
           gpIdx = i;
+          sharedState.gpName = pads[i]?.id ?? "Unknown Gamepad";
+          notifyListeners();
           break;
         }
       }
     }
 
-    if (gpIdx === null) return;
-    const gp = pads[gpIdx];
-    if (!gp) return;
+    const gp = gpIdx !== null ? pads[gpIdx] : null;
 
-    const am = loadLS(LS_AXIS, DEFAULT_AXIS_MAPPING);
-    const bm = loadLS<Record<number, ROVAction>>(LS_BTN, DEFAULT_BUTTON_MAPPING);
+    if (sharedState.gpEnabled && gp) {
+      // Backend expects: 1=Lateral, 2=Forward, 3=Throttle, 4=Yaw
+      ch[1] = axisPWM((gp.axes[am.lateral.axisIdx] ?? 0) * calib.lateral, am.lateral.invert);
+      ch[2] = axisPWM((gp.axes[am.forward.axisIdx] ?? 0) * calib.forward, am.forward.invert);
+      ch[3] = axisPWM((gp.axes[am.throttle.axisIdx] ?? 0) * calib.throttle, am.throttle.invert);
+      ch[4] = axisPWM((gp.axes[am.yaw.axisIdx] ?? 0) * calib.yaw, am.yaw.invert);
 
-    // 1. Calculate Stick Movement PWM Channels (Supporting both 4-ch and ArduSub 6-ch layouts)
-    const ch: Record<number, number> = {
-      1: axisPWM(gp.axes[am.lateral.axisIdx] ?? 0, am.lateral.invert),   // Lateral (Legacy Ch 1)
-      2: axisPWM(gp.axes[am.forward.axisIdx] ?? 0, am.forward.invert),   // Forward (Legacy Ch 2)
-      3: axisPWM(gp.axes[am.throttle.axisIdx] ?? 0, am.throttle.invert),  // Throttle (Ch 3 Vertical)
-      4: axisPWM(gp.axes[am.yaw.axisIdx] ?? 0, am.yaw.invert),           // Yaw (Ch 4 Turning)
-      5: axisPWM(gp.axes[am.forward.axisIdx] ?? 0, am.forward.invert),   // Forward (ArduSub Standard Ch 5)
-      6: axisPWM(gp.axes[am.lateral.axisIdx] ?? 0, am.lateral.invert),   // Lateral (ArduSub Standard Ch 6)
-    };
-
-    // 2. D-Pad Movement Support via Axis #9 (POV Hat)
-    const povParsed = parsePOVHat(gp.axes[9] ?? gp.axes[4] ?? 0);
-
-    if (ch[5] === 1500 && ch[2] === 1500) {
-      if (povParsed.up) { ch[2] = 1800; ch[5] = 1800; }
-      else if (povParsed.down) { ch[2] = 1200; ch[5] = 1200; }
+      Array.from(gp.buttons).forEach((b, i) => {
+        btns[i] = b.pressed || (typeof b === "object" && b.value > 0.5);
+      });
+    } else if (sharedState.kbEnabled) {
+      ch[1] = 1500 + (keys["d"] ? 300 : 0) - (keys["a"] ? 300 : 0);
+      ch[2] = 1500 + (keys["w"] ? 300 : 0) - (keys["s"] ? 300 : 0);
+      ch[3] = 1500 + (keys["arrowup"] ? 300 : 0) - (keys["arrowdown"] ? 300 : 0);
+      ch[4] = 1500 + (keys["arrowright"] ? 300 : 0) - (keys["arrowleft"] ? 300 : 0);
+    } else if (gpIdx === null && sharedState.gpName !== null) {
+      sharedState.gpName = null;
+      notifyListeners();
     }
-    if (ch[6] === 1500 && ch[1] === 1500) {
-      if (povParsed.left) { ch[1] = 1200; ch[6] = 1200; }
-      else if (povParsed.right) { ch[1] = 1800; ch[6] = 1800; }
-    }
-
-    // 3. Fallback D-Pad Buttons 12-15 Movement
-    if (ch[5] === 1500 && ch[2] === 1500) {
-      if (gp.buttons[12]?.pressed && (!bm[12] || bm[12] === "none")) { ch[2] = 1800; ch[5] = 1800; }
-      else if (gp.buttons[13]?.pressed && (!bm[13] || bm[13] === "none")) { ch[2] = 1200; ch[5] = 1200; }
-    }
-    if (ch[6] === 1500 && ch[1] === 1500) {
-      if (gp.buttons[15]?.pressed && (!bm[15] || bm[15] === "none")) { ch[1] = 1800; ch[6] = 1800; }
-      else if (gp.buttons[14]?.pressed && (!bm[14] || bm[14] === "none")) { ch[1] = 1200; ch[6] = 1200; }
-    }
-
-    // 4. Button Press Detection (Rising Edge Only)
-    const btns = Array.from(gp.buttons).map(
-      (b) => b.pressed || (typeof b === "object" && b.value > 0.5),
-    );
-    if (povParsed.up) btns[12] = true;
-    if (povParsed.down) btns[13] = true;
-    if (povParsed.left) btns[14] = true;
-    if (povParsed.right) btns[15] = true;
-
-    const a0 = gp.axes[0] ?? 0;
-    const a1 = gp.axes[1] ?? 0;
-    const a2 = gp.axes[2] ?? 0;
-    const a5 = gp.axes[5] ?? 0;
-
-    if (a1 < -0.45) btns[20] = true;
-    if (a1 > 0.45) btns[21] = true;
-    if (a0 < -0.45) btns[22] = true;
-    if (a0 > 0.45) btns[23] = true;
-
-    if (a2 < -0.45) btns[24] = true;
-    if (a2 > 0.45) btns[25] = true;
-    if (a5 < -0.45) btns[26] = true;
-    if (a5 > 0.45) btns[27] = true;
 
     btns.forEach((pressed, i) => {
       if (pressed && !(prevBtns[i] ?? false)) {
@@ -369,9 +338,12 @@ function initGlobalGamepadLoop() {
     });
     prevBtns = btns;
 
-    // 5. Emit RC Override continuously over global socket
+    sharedState.channels = ch;
+    sharedState.emitCount += 1;
+    notifyListeners();
+
     sharedSocket.emit("cmd_rc_override", { channels: ch });
-  }, 30);
+  }, 50);
 }
 
 function initSingletonSocket() {
@@ -379,9 +351,22 @@ function initSingletonSocket() {
   if (typeof window === "undefined") return;
 
   sharedSocket = io(ROV_URL, { transports: ["websocket"] });
+  globalAny.__rovSharedSocket = sharedSocket;
 
   sharedSocket.on("connect", () => {
     sharedState.connected = true;
+    notifyListeners();
+    fetch(`${ROV_URL}/api/config`)
+      .then(res => res.json())
+      .then(data => {
+        sharedState.config = data;
+        notifyListeners();
+      })
+      .catch(err => console.error("Failed to load config:", err));
+  });
+
+  sharedSocket.on("config_update", (data: any) => {
+    sharedState.config = data;
     notifyListeners();
   });
 
@@ -464,7 +449,10 @@ function initSingletonSocket() {
   });
 
   // Latency Ping-Pong
-  setInterval(() => {
+  if (globalAny.__rovPingInterval) {
+    clearInterval(globalAny.__rovPingInterval);
+  }
+  globalAny.__rovPingInterval = setInterval(() => {
     if (sharedSocket?.connected) {
       sharedSocket.emit("ping_rov", { sent_at: Date.now() });
     }
@@ -520,9 +508,13 @@ export function useROVSocket() {
   const sendRCOverride = (channels: Record<number, number>) =>
     sharedSocket?.emit("cmd_rc_override", { channels });
 
-  const sendSaveMapping = (axis: any, btn: any) => {
-    saveLS(LS_AXIS, axis);
-    saveLS(LS_BTN, btn);
+  const setGpEnabled = (enabled: boolean) => {
+    sharedState.gpEnabled = enabled;
+    notifyListeners();
+  };
+  const setKbEnabled = (enabled: boolean) => {
+    sharedState.kbEnabled = enabled;
+    notifyListeners();
   };
 
   return {
@@ -537,6 +529,7 @@ export function useROVSocket() {
     sendAutonomousStart,
     sendAutonomousStop,
     sendRCOverride,
-    sendSaveMapping,
+    setGpEnabled,
+    setKbEnabled,
   };
 }

@@ -14,20 +14,7 @@ export const Route = createFileRoute("/navigation")({
   component: NavigationPath,
 });
 
-function useClock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
-
 function NavigationPath() {
-  const now = useClock();
-  const dayName = now.toLocaleDateString("en-GB", { weekday: "long" });
-  const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  const timeStr = now.toLocaleTimeString("en-GB", { hour12: false });
 
   const socket = useROVSocket();
 
@@ -51,22 +38,6 @@ function NavigationPath() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-background text-foreground select-none overflow-y-auto lg:overflow-hidden">
-      {/* Top Bar */}
-      <header className="h-12 shrink-0 border-b border-panel-border px-4 flex items-center justify-between bg-[color:var(--color-sidebar)] gap-3">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="label-caps">Team</span>
-          <span className="font-mono font-semibold">POLIWANGI HYDROMODELLING CLUB 4</span>
-        </div>
-        <div className="hidden md:flex items-center gap-2 text-xs">
-          <span className="label-caps">University</span>
-          <span className="text-foreground">Politeknik Negeri Banyuwangi</span>
-        </div>
-        <div className="flex items-center gap-2 font-mono text-xs text-right">
-          <span className="text-muted-foreground text-[11px]">{dayName}, {dateStr}</span>
-          <span className="text-muted-foreground/40">•</span>
-          <span className="font-bold text-foreground">{timeStr}</span>
-        </div>
-      </header>
 
       {/* Responsive Navigation Layout */}
       <div className="flex-1 min-h-0 p-2.5 flex flex-col lg:flex-row gap-2.5 overflow-y-auto lg:overflow-hidden">
