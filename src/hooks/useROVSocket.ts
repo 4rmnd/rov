@@ -251,6 +251,12 @@ function initGlobalGamepadLoop() {
     const gp = gpIdx !== null ? pads[gpIdx] : null;
 
     if (sharedState.gpEnabled && gp) {
+      // Debug print to help diagnose why it's 1500
+      if (Math.abs(gp.axes[am.lateral.axisIdx] ?? 0) > 0.1 || Math.abs(gp.axes[am.forward.axisIdx] ?? 0) > 0.1) {
+          console.log("[Gamepad] Raw Axes:", gp.axes);
+          console.log("[Gamepad] Mapped:", { lateral: am.lateral.axisIdx, forward: am.forward.axisIdx });
+      }
+
       // Backend expects: 1=Lateral, 2=Forward, 3=Throttle, 4=Yaw
       ch[1] = axisPWM((gp.axes[am.lateral.axisIdx] ?? 0) * calib.lateral, am.lateral.invert);
       ch[2] = axisPWM((gp.axes[am.forward.axisIdx] ?? 0) * calib.forward, am.forward.invert);
